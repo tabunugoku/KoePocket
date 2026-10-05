@@ -3,6 +3,7 @@ package com.example.koekoe.data
 import android.content.Context
 import androidx.work.*
 import com.example.koekoe.KoeKoeApp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -13,8 +14,12 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val id = inputData.getLong(KEY_ID, -1)
         val detail = try {
             app.api.detail(id)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: NotFoundException) {
+            return Result.failure() // 削除された投稿は何度試しても取得できない
         } catch (e: Exception) {
-            return Result.retry()
+            return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         } ?: return Result.failure()
         val target = try {
             FileStore.open(applicationContext, app.settings, id, detail.title)
@@ -48,8 +53,10 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 }
             }
         } catch (e: Exception) {
+            runCatching { target.out.close() }
             target.discard()
-            return if (runAttemptCount < 3) Result.retry() else Result.failure()
+            if (e is CancellationException) throw e
+            return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
         target.commit()
         app.library.addDownload(detail, target.pathOrUri)
@@ -57,6 +64,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     }
 
     companion object {
+        private const val MAX_ATTEMPTS = 3
         private const val KEY_ID = "id"
         const val KEY_PCT = "pct"
         fun workName(id: Long) = "dl_$id"

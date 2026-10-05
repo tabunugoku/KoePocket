@@ -59,6 +59,7 @@ fun DetailScreen(
     var reload by remember { mutableIntStateOf(0) }
     var offline by remember { mutableStateOf(false) }
     var removedOnSite by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     LaunchedEffect(id, reload) {
         error = null
         removedOnSite = false
@@ -131,12 +132,7 @@ fun DetailScreen(
                             Icon(if (fav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, "お気に入り")
                         }
                         when {
-                            downloaded != null -> IconButton(onClick = {
-                                scope.launch {
-                                    FileStore.delete(ctx, downloaded.path)
-                                    dao.removeDownload(id)
-                                }
-                            }) { Icon(Icons.Filled.DownloadDone, "ダウンロード済み(タップで削除)") }
+                            downloaded != null -> IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.DownloadDone, "ダウンロード済み(タップで削除)") }
                             downloading -> Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (pct >= 0) {
                                     Text("$pct%", style = MaterialTheme.typography.labelMedium)
@@ -170,6 +166,23 @@ fun DetailScreen(
             }
         },
     ) { pad ->
+        if (confirmDelete && downloaded != null) {
+            AlertDialog(
+                onDismissRequest = { confirmDelete = false },
+                title = { Text("保存した音声を削除") },
+                text = { Text("端末に保存したファイルを削除します。よろしいですか？") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmDelete = false
+                        scope.launch {
+                            FileStore.delete(ctx, downloaded.path)
+                            dao.removeDownload(id)
+                        }
+                    }) { Text("削除") }
+                },
+                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("キャンセル") } },
+            )
+        }
         val d = detail
         if (d == null) {
             Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
