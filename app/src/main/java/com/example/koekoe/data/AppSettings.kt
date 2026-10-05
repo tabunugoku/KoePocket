@@ -50,18 +50,24 @@ class AppSettings(ctx: Context) {
         get() = prefs.getString(KEY_DISGUISE_TITLE, DEFAULT_DISGUISE_TITLE).orEmpty()
         set(v) = prefs.edit { putString(KEY_DISGUISE_TITLE, v) }
 
+    /** 最近使ったアプリの一覧やスクリーンショットに、画面を映さない (FLAG_SECURE)。 */
+    var secureScreen: Boolean
+        get() = prefs.getBoolean(KEY_SECURE, true)
+        set(v) = prefs.edit { putBoolean(KEY_SECURE, v) }
+
     companion object {
         const val LEGAL_VERSION = 1
         const val DEFAULT_DISGUISE_APP = "音楽"
         const val DEFAULT_DISGUISE_TITLE = "再生中"
+        private const val KEY_SECURE = "secure_screen"
         private const val KEY_LEGAL = "accepted_legal_version"
         private const val KEY_DISGUISE = "disguise_enabled"
         private const val KEY_DISGUISE_APP = "disguise_app_name"
         private const val KEY_DISGUISE_TITLE = "disguise_title"
-        const val KEY_TAGS = "cached_tags"
-        const val KEY_DIR_PREPARED = "default_dir_prepared"
-        const val KEY_AUTO_DL = "auto_download_on_favorite"
-        const val KEY_SYNC = "sync_folders"
-        const val KEY_DIR = "download_tree_uri"
+        private const val KEY_TAGS = "cached_tags"
+        private const val KEY_DIR_PREPARED = "default_dir_prepared"
+        private const val KEY_AUTO_DL = "auto_download_on_favorite"
+        private const val KEY_SYNC = "sync_folders"
+        private const val KEY_DIR = "download_tree_uri"
     }
 }

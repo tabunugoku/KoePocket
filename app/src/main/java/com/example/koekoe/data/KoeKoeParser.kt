@@ -1,5 +1,6 @@
 package com.example.koekoe.data
 
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
@@ -46,6 +47,7 @@ object KoeKoeParser {
             src.startsWith("http") -> src
             else -> BASE + src.removePrefix("./")
         }
+        if (!isTrustedAudioUrl(audioUrl)) return null
         val title = doc.title().substringBefore(" - Koe-Koe").replace(Regex("""\s*\[\d+]$"""), "").trim()
         val tags = doc.select("#tag a[href^=tag_list.php]").map { it.text() }
         val comments = doc.select("p:has(> span.entry_auth)").mapNotNull { p ->
@@ -76,6 +78,12 @@ object KoeKoeParser {
                     ?.groupValues?.get(1)?.toIntOrNull(),
             ),
         )
+    }
+
+    /** 音声の取得先は、koe-koe.com とそのサブドメイン (file.koe-koe.com など) の https だけに限る。 */
+    fun isTrustedAudioUrl(url: String): Boolean {
+        val u = url.toHttpUrlOrNull() ?: return false
+        return u.isHttps && (u.host == "koe-koe.com" || u.host.endsWith(".koe-koe.com"))
     }
 
     /** all_tag.php のタグ一覧 (重複なし、出現順)。 */

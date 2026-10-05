@@ -121,7 +121,7 @@ fun DetailScreen(
                                 if (fav) {
                                     dao.removeFavorite(id)
                                 } else {
-                                    app.library.addFavorite(d)
+                                    app.library.addFavorite(d, partial = offline)
                                     // 設定がONで、まだ保存していなければ自動でダウンロードする
                                     if (app.settings.autoDownloadOnFavorite && downloaded == null && !offline) {
                                         DownloadWorker.enqueue(ctx, id)

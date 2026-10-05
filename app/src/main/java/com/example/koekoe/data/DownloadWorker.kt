@@ -1,6 +1,11 @@
 package com.example.koekoe.data
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ServiceInfo
+import android.os.Build
+import androidx.core.app.NotificationCompat
 import androidx.work.*
 import com.example.koekoe.KoeKoeApp
 import kotlinx.coroutines.CancellationException
@@ -12,6 +17,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val app = applicationContext as KoeKoeApp
         val id = inputData.getLong(KEY_ID, -1)
+        // 長いダウンロードを OS に止められないよう、通知つき (フォアグラウンド) で実行する
+        runCatching { setForeground(foregroundInfo(app, id)) }
         val detail = try {
             app.api.detail(id)
         } catch (e: CancellationException) {
@@ -58,12 +65,39 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             if (e is CancellationException) throw e
             return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
-        target.commit()
-        app.library.addDownload(detail, target.pathOrUri)
+        val path = target.commit()
+        app.library.addDownload(detail, path)
         return Result.success()
     }
 
+    private fun foregroundInfo(app: KoeKoeApp, id: Long): ForegroundInfo {
+        val ctx = applicationContext
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "ダウンロード", NotificationManager.IMPORTANCE_LOW))
+        // 通知の偽装が有効なら、再生通知と同じく表示を差し替える
+        val s = app.settings
+        val disguised = s.disguiseEnabled
+        val title = if (disguised) s.disguiseTitle.ifBlank { s.disguiseAppName } else "ダウンロード中"
+        val n = NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle(title)
+            .setOngoing(true)
+            .setSilent(true)
+            .setProgress(0, 0, true)
+            .build()
+        if (disguised && s.disguiseAppName.isNotBlank()) n.extras.putString("android.substName", s.disguiseAppName)
+        val nid = NOTIFICATION_ID + (id % 1000).toInt()
+        return if (Build.VERSION.SDK_INT >= 29) {
+            ForegroundInfo(nid, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(nid, n)
+        }
+    }
+
     companion object {
+        private const val CHANNEL_ID = "download"
+        private const val NOTIFICATION_ID = 2000
+        const val TAG = "download"
         private const val MAX_ATTEMPTS = 3
         private const val KEY_ID = "id"
         const val KEY_PCT = "pct"
@@ -72,6 +106,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         fun enqueue(ctx: Context, id: Long) {
             val req = OneTimeWorkRequestBuilder<DownloadWorker>()
                 .setInputData(workDataOf(KEY_ID to id))
+                .addTag(TAG)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .build()
             WorkManager.getInstance(ctx).enqueueUniqueWork(workName(id), ExistingWorkPolicy.KEEP, req)

@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
         val navy = Navy.toArgb()
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(navy), navigationBarStyle = SystemBarStyle.dark(navy))
         val app = application as KoeKoeApp
+        setSecureScreen(this, app.settings.secureScreen)
         app.player // 再生サービスへの接続を先に開始する
         setContent {
             KoePocketTheme {
@@ -338,3 +339,9 @@ private fun b64(s: String): String =
 
 private fun unb64(s: String): String =
     String(android.util.Base64.decode(s, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING))
+
+/** 最近使ったアプリの一覧やスクリーンショットに画面を映さない (FLAG_SECURE) かどうかを切り替える。 */
+fun setSecureScreen(activity: android.app.Activity, enabled: Boolean) {
+    if (enabled) activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+    else activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+}

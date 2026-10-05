@@ -1,5 +1,8 @@
 package com.example.koekoe.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,6 +19,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.koekoe.KoeKoeApp
 import com.example.koekoe.data.FileStore
+import com.example.koekoe.setSecureScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 @Composable
@@ -29,6 +35,8 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
     var disguise by remember { mutableStateOf(settings.disguiseEnabled) }
     var disguiseApp by remember { mutableStateOf(settings.disguiseAppName) }
     var disguiseTitle by remember { mutableStateOf(settings.disguiseTitle) }
+    var secure by remember { mutableStateOf(settings.secureScreen) }
+    var cacheCleared by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
@@ -36,6 +44,7 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
             ctx.contentResolver.takePersistableUriPermission(
                 uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
             )
+            if (treeUri != uri.toString()) releaseTree(ctx, treeUri)
             settings.downloadTreeUri = uri.toString()
             treeUri = uri.toString()
         }
@@ -76,7 +85,7 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
                 )
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { picker.launch(null) }) { Text("フォルダを選ぶ") }
-                    if (treeUri != null) OutlinedButton(onClick = { settings.downloadTreeUri = null; treeUri = null }) {
+                    if (treeUri != null) OutlinedButton(onClick = { releaseTree(ctx, treeUri); settings.downloadTreeUri = null; treeUri = null }) {
                         Text("既定に戻す")
                     }
                 }
@@ -104,6 +113,35 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
                 )
             }
             HorizontalDivider()
+            SettingSwitch(
+                title = "画面を隠す",
+                description = "最近使ったアプリの一覧に画面を映さず、スクリーンショットや画面録画も止めます。",
+                checked = secure,
+            ) {
+                secure = it
+                settings.secureScreen = it
+                ctx.findActivity()?.let { a -> setSecureScreen(a, it) }
+            }
+            HorizontalDivider()
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Text("キャッシュ", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "閲覧した一覧や詳細ページの一時データ (最大20MB) を端末に残しています。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) { runCatching { app.api.client.cache?.evictAll() } }
+                            cacheCleared = true
+                        }
+                    }) { Text("キャッシュを削除") }
+                    if (cacheCleared) Text("削除しました", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp))
+                }
+            }
+            HorizontalDivider()
             Text(
                 "利用上の注意・プライバシー",
                 style = MaterialTheme.typography.bodyLarge,
@@ -122,4 +160,23 @@ private fun SettingSwitch(title: String, description: String, checked: Boolean, 
         }
         Switch(checked = checked, onCheckedChange = onChange)
     }
+}
+
+/** 保存先に選んでいたフォルダの永続的な権限を手放す (保存先を変えたときに権限がたまらないように)。 */
+private fun releaseTree(ctx: Context, tree: String?) {
+    if (tree == null) return
+    runCatching {
+        ctx.contentResolver.releasePersistableUriPermission(
+            Uri.parse(tree), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        )
+    }
+}
+
+private fun Context.findActivity(): Activity? {
+    var c = this
+    while (c is ContextWrapper) {
+        if (c is Activity) return c
+        c = c.baseContext
+    }
+    return null
 }

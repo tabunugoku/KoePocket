@@ -1,9 +1,12 @@
 package com.example.koekoe.data
 
+import android.content.ContentResolver
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
@@ -28,8 +31,11 @@ object FileStore {
 
     private fun safeName(title: String) = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(60)
 
-    /** 書き込み先。書き終えたら [commit]、失敗したら [discard] を呼ぶ。 */
-    class Target(val pathOrUri: String, val out: OutputStream, val commit: () -> Unit, val discard: () -> Unit)
+    /** 書きかけのファイルにつける拡張子 (SAF・アプリ専用フォルダ)。完了時に .mp3 へ改名する。 */
+    private const val PART_EXT = ".part"
+
+    /** 書き込み先。書き終えたら [commit] (保存先の最終的なパス/URI を返す)、失敗したら [discard] を呼ぶ。 */
+    class Target(val out: OutputStream, val commit: () -> String, val discard: () -> Unit)
 
     fun open(ctx: Context, settings: AppSettings, id: Long, title: String): Target {
         val base = "${id}_${safeName(title)}"
@@ -41,10 +47,19 @@ object FileStore {
     private fun openInTree(ctx: Context, tree: String, base: String): Target? {
         val dir = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(tree)) }.getOrNull()
         if (dir == null || !dir.canWrite()) return null
-        dir.findFile("$base.mp3")?.delete()
-        val doc = dir.createFile("audio/mpeg", base) ?: return null
+        dir.findFile("$base$PART_EXT")?.delete()
+        val doc = dir.createFile("application/octet-stream", base + PART_EXT) ?: return null
         val out = ctx.contentResolver.openOutputStream(doc.uri) ?: return null
-        return Target(doc.uri.toString(), out, commit = {}, discard = { doc.delete() })
+        return Target(
+            out,
+            commit = {
+                dir.findFile("$base.mp3")?.delete()
+                // 改名できなければ .part のまま残す (再生はできる)。renameTo は成功すると doc.uri を新しい URI に更新する
+                doc.renameTo("$base.mp3")
+                doc.uri.toString()
+            },
+            discard = { doc.delete() },
+        )
     }
 
     /** Music/KoePocket に MediaStore で保存する。フォルダが無ければ自動で作られる。書き込み中は IS_PENDING で隠す。 */
@@ -69,9 +84,10 @@ object FileStore {
         val uri = resolver.insert(collection, values) ?: return null
         val out = resolver.openOutputStream(uri) ?: return null
         Target(
-            uri.toString(), out,
+            out,
             commit = {
                 resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
+                uri.toString()
             },
             discard = { runCatching { resolver.delete(uri, null, null) } },
         )
@@ -79,8 +95,16 @@ object FileStore {
 
     private fun openInAppDir(ctx: Context, base: String): Target {
         val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: ctx.filesDir
+        val part = File(dir, "$base.mp3$PART_EXT")
         val file = File(dir, "$base.mp3")
-        return Target(file.absolutePath, file.outputStream(), commit = {}, discard = { file.delete() })
+        return Target(
+            part.outputStream(),
+            commit = {
+                file.delete()
+                if (part.renameTo(file)) file.absolutePath else part.absolutePath
+            },
+            discard = { part.delete() },
+        )
     }
 
     /** 初回起動時に Music/KoePocket を作る (できなければ最初のダウンロード時に自動で作られる)。 */
@@ -88,6 +112,31 @@ object FileStore {
         if (!hasMediaStore) return
         runCatching {
             File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), DEFAULT_DIR_NAME).mkdirs()
+        }
+    }
+
+    /**
+     * 中断されて残った書きかけのファイルを消す。ダウンロードが動いていないときだけ呼ぶこと。
+     * 対象は、このアプリが付けた印 (MediaStore の IS_PENDING / 拡張子 .part) のあるファイルだけ。
+     */
+    fun cleanupOrphans(ctx: Context, settings: AppSettings) = runCatching {
+        if (hasMediaStore) {
+            val resolver = ctx.contentResolver
+            val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            val args = Bundle().apply {
+                putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "${MediaStore.Audio.Media.RELATIVE_PATH} = ?")
+                putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf("${Environment.DIRECTORY_MUSIC}/$DEFAULT_DIR_NAME/"))
+                putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_ONLY)
+            }
+            val ids = mutableListOf<Long>()
+            resolver.query(collection, arrayOf(MediaStore.Audio.Media._ID), args, null)?.use { c ->
+                while (c.moveToNext()) ids += c.getLong(0)
+            }
+            ids.forEach { resolver.delete(ContentUris.withAppendedId(collection, it), null, null) }
+        }
+        ctx.getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.listFiles { f -> f.name.endsWith(PART_EXT) }?.forEach { it.delete() }
+        settings.downloadTreeUri?.let { tree ->
+            DocumentFile.fromTreeUri(ctx, Uri.parse(tree))?.listFiles()?.filter { it.name?.endsWith(PART_EXT) == true }?.forEach { it.delete() }
         }
     }
 

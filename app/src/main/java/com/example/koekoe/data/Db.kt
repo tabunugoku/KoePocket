@@ -121,7 +121,7 @@ interface AppDao {
     suspend fun clearDownloadFolder(folderId: Long)
 }
 
-@Database(entities = [Favorite::class, Downloaded::class, Folder::class], version = 4, exportSchema = false)
+@Database(entities = [Favorite::class, Downloaded::class, Folder::class], version = 4, exportSchema = true)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): AppDao
 

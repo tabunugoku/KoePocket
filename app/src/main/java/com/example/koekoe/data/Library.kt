@@ -4,15 +4,19 @@ package com.example.koekoe.data
 class Library(private val db: AppDb, private val settings: AppSettings) {
     private val dao get() = db.dao()
 
-    /** お気に入りに追加。同期ON で保存済みなら、保存済み側のフォルダを引き継ぐ。 */
-    suspend fun addFavorite(d: VoiceDetail) {
-        val folder = if (settings.syncFolders) dao.downloaded(d.id)?.folderId else null
+    /**
+     * お気に入りに追加。同期ON で保存済みなら、保存済み側のフォルダを引き継ぐ。
+     * [partial] は保存済みの控えから作った不完全な詳細 (オフライン表示)。コメント数が分からないので記録しない。
+     */
+    suspend fun addFavorite(d: VoiceDetail, partial: Boolean = false) {
+        val folder = (if (settings.syncFolders) dao.downloaded(d.id)?.folderId else null)
+            ?: dao.favorite(d.id)?.folderId
         dao.putFavorite(
             Favorite(
                 d.id, d.title, d.duration, System.currentTimeMillis(), folder,
                 gender = d.gender.ifEmpty { null },
                 author = d.author.ifEmpty { null },
-                commentCount = d.comments.size,
+                commentCount = if (partial) null else d.comments.size,
             ),
         )
     }
@@ -38,7 +42,8 @@ class Library(private val db: AppDb, private val settings: AppSettings) {
 
     /** ダウンロード完了時。同期ON でお気に入りなら、お気に入り側のフォルダに入れる。 */
     suspend fun addDownload(d: VoiceDetail, path: String) {
-        val folder = if (settings.syncFolders) dao.favorite(d.id)?.folderId else null
+        val folder = (if (settings.syncFolders) dao.favorite(d.id)?.folderId else null)
+            ?: dao.downloaded(d.id)?.folderId
         dao.putDownload(
             Downloaded(
                 d.id, d.title, path, System.currentTimeMillis(), folder,
