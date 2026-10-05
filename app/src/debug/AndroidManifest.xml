@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- デバッグビルド専用: adb から SQL を流して検証用のデータを作る (リリースビルドには含まれない) -->
+    <application>
+        <receiver
+            android:name="com.example.koekoe.DebugSqlReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.koekoe.DEBUG_SQL" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.KoeKoe" parent="android:Theme.Material.NoActionBar" />
+</resources>
