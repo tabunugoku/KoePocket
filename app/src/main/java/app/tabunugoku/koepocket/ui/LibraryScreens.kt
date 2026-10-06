@@ -32,7 +32,9 @@ import app.tabunugoku.koepocket.KoeKoeApp
 import app.tabunugoku.koepocket.data.FileStore
 import app.tabunugoku.koepocket.data.Folder
 import app.tabunugoku.koepocket.data.SearchHistory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private data class LibItem(
     val id: Long,
@@ -67,7 +69,7 @@ fun FavoritesScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier =
     val dao = app.db.dao()
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val favs by dao.favorites().collectAsState(initial = emptyList())
+    val favs by remember(dao) { dao.favorites() }.collectAsState(initial = emptyList())
     LibraryScreen(
         app = app,
         title = stringResource(R.string.tab_favorites),
@@ -90,7 +92,7 @@ fun DownloadsScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier =
     val dao = app.db.dao()
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val list by dao.downloads().collectAsState(initial = emptyList())
+    val list by remember(dao) { dao.downloads() }.collectAsState(initial = emptyList())
     LibraryScreen(
         app = app,
         title = stringResource(R.string.tab_downloads),
@@ -106,7 +108,7 @@ fun DownloadsScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier =
         onDelete = { ids ->
             scope.launch {
                 list.filter { it.id in ids }.forEach {
-                    FileStore.delete(ctx, it.path)
+                    withContext(Dispatchers.IO) { FileStore.delete(ctx, it.path) }
                     dao.removeDownload(it.id)
                 }
             }
@@ -132,7 +134,7 @@ private fun LibraryScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    val folders by app.db.dao().folders().collectAsState(initial = emptyList())
+    val folders by remember(app) { app.db.dao().folders() }.collectAsState(initial = emptyList())
     var hist by remember { mutableStateOf(history.get(historyScope)) }
     val keyboard = LocalSoftwareKeyboardController.current
 

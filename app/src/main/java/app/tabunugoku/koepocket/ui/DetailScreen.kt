@@ -2,6 +2,7 @@ package app.tabunugoku.koepocket.ui
 
 import androidx.compose.ui.res.stringResource
 import app.tabunugoku.koepocket.R
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -36,8 +37,10 @@ import app.tabunugoku.koepocket.data.Genre
 import app.tabunugoku.koepocket.data.NotFoundException
 import app.tabunugoku.koepocket.data.VoiceComment
 import app.tabunugoku.koepocket.data.VoiceDetail
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val ANONYMOUS = "名無し"
 private const val DESCRIPTION_LINES = 6
@@ -89,12 +92,21 @@ fun DetailScreen(
         }
     }
 
-    val favIds by dao.favoriteIds().collectAsState(initial = emptyList())
-    val downloads by dao.downloads().collectAsState(initial = emptyList())
-    val downloaded = downloads.firstOrNull { it.id == id }
-    val works by WorkManager.getInstance(ctx).getWorkInfosForUniqueWorkFlow(DownloadWorker.workName(id))
+    // Flow は remember で固定する (毎回作り直すと再コンポーズのたびに DB を引き直してしまう)
+    val favIds by remember(dao) { dao.favoriteIds() }.collectAsState(initial = emptyList())
+    val downloaded by remember(dao, id) { dao.downloadedFlow(id) }.collectAsState(initial = null)
+    val works by remember(ctx, id) { WorkManager.getInstance(ctx).getWorkInfosForUniqueWorkFlow(DownloadWorker.workName(id)) }
         .collectAsState(initial = emptyList())
     val downloading = works.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+    // この画面でダウンロードが動いたあとに失敗で終わったときだけ知らせる (過去の失敗記録では出さない)
+    var sawDownload by remember(id) { mutableStateOf(false) }
+    LaunchedEffect(works) {
+        if (downloading) sawDownload = true
+        else if (sawDownload && works.any { it.state == WorkInfo.State.FAILED }) {
+            sawDownload = false
+            Toast.makeText(ctx, R.string.download_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
     val pct = works.firstOrNull { it.state == WorkInfo.State.RUNNING }?.progress?.getInt(DownloadWorker.KEY_PCT, -1) ?: -1
     val player by app.player.state.collectAsState()
     val isCurrent = player.currentId == id
@@ -169,7 +181,8 @@ fun DetailScreen(
             }
         },
     ) { pad ->
-        if (confirmDelete && downloaded != null) {
+        val saved = downloaded
+        if (confirmDelete && saved != null) {
             AlertDialog(
                 onDismissRequest = { confirmDelete = false },
                 title = { Text(stringResource(R.string.delete_saved_title)) },
@@ -178,7 +191,7 @@ fun DetailScreen(
                     TextButton(onClick = {
                         confirmDelete = false
                         scope.launch {
-                            FileStore.delete(ctx, downloaded.path)
+                            withContext(Dispatchers.IO) { FileStore.delete(ctx, saved.path) }
                             dao.removeDownload(id)
                         }
                     }) { Text(stringResource(R.string.delete)) }
@@ -189,8 +202,9 @@ fun DetailScreen(
         val d = detail
         if (d == null) {
             Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (error != null) Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(error!!, modifier = Modifier.padding(horizontal = 24.dp), textAlign = TextAlign.Center)
+                val err = error
+                if (err != null) Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(err, modifier = Modifier.padding(horizontal = 24.dp), textAlign = TextAlign.Center)
                     TextButton(onClick = { reload++ }) { Text(stringResource(R.string.reload)) }
                 } else CircularProgressIndicator()
             }

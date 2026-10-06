@@ -75,6 +75,9 @@ interface AppDao {
     @Query("SELECT * FROM Downloaded WHERE id = :id")
     suspend fun downloaded(id: Long): Downloaded?
 
+    @Query("SELECT * FROM Downloaded WHERE id = :id")
+    fun downloadedFlow(id: Long): Flow<Downloaded?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putDownload(d: Downloaded)
 
