@@ -1,5 +1,8 @@
 package com.example.koekoe.data
 
+import androidx.annotation.StringRes
+import com.example.koekoe.R
+
 data class VoiceItem(
     val id: Long,
     val title: String,
@@ -41,11 +44,11 @@ fun genderFromG(g: Int?): String = when (g) {
 }
 
 /** [g] は list.php の g パラメータ。null は全投稿 (v_list.php)。 */
-enum class Category(val label: String, val g: Int?) {
-    ALL("全て", null),
-    FEMALE("女性", 1),
-    MALE("男性", 2),
-    COUPLE("カップル", 3);
+enum class Category(@StringRes val labelRes: Int, val g: Int?) {
+    ALL(R.string.cat_all, null),
+    FEMALE(R.string.cat_female, 1),
+    MALE(R.string.cat_male, 2),
+    COUPLE(R.string.cat_couple, 3);
 
     /**
      * 一覧のパス。タグ指定があればタグ一覧 (g でカテゴリを絞れる)。
@@ -59,13 +62,21 @@ enum class Category(val label: String, val g: Int?) {
 }
 
 /** list.php の g2 パラメータ (all_genre.php より)。 */
-enum class Genre(val label: String, val g2: Int) {
-    ALL("すべて", 0),
-    EROGOE("エロ声", 1),
-    ONAGOE("オナ声", 2),
-    EXPERIENCE("体験談", 4),
-    SECRET("私の秘密", 5),
-    CALL("通話", 6),
-    OTHER("その他", 3),
-    ARCHIVE("アーカイブ", 10),
+enum class Genre(@StringRes val labelRes: Int, val g2: Int) {
+    ALL(R.string.genre_all, 0),
+    EROGOE(R.string.genre_erogoe, 1),
+    ONAGOE(R.string.genre_onagoe, 2),
+    EXPERIENCE(R.string.genre_experience, 4),
+    SECRET(R.string.genre_secret, 5),
+    CALL(R.string.genre_call, 6),
+    OTHER(R.string.genre_other, 3),
+    ARCHIVE(R.string.genre_archive, 10);
+
+    companion object {
+        /** 詳細ページのジャンルのリンク (list.php?g=..&g2=..) から、ジャンルを引く。分からなければ null。 */
+        fun fromPath(path: String?): Genre? {
+            val g2 = Regex("""[?&]g2=(\d+)""").find(path.orEmpty())?.groupValues?.get(1)?.toIntOrNull() ?: return null
+            return entries.firstOrNull { it.g2 == g2 && it != ALL }
+        }
+    }
 }

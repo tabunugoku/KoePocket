@@ -1,10 +1,11 @@
 package com.example.koekoe.data
 
+import com.example.koekoe.R
 import android.content.Context
 import androidx.core.content.edit
 
 /** アプリの設定 (SharedPreferences)。 */
-class AppSettings(ctx: Context) {
+class AppSettings(private val ctx: Context) {
     private val prefs = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     /** お気に入りに入れたら自動でダウンロードする。 */
@@ -43,11 +44,11 @@ class AppSettings(ctx: Context) {
         set(v) = prefs.edit { putBoolean(KEY_DISGUISE, v) }
 
     var disguiseAppName: String
-        get() = prefs.getString(KEY_DISGUISE_APP, DEFAULT_DISGUISE_APP).orEmpty()
+        get() = prefs.getString(KEY_DISGUISE_APP, null) ?: ctx.getString(R.string.disguise_default_app)
         set(v) = prefs.edit { putString(KEY_DISGUISE_APP, v) }
 
     var disguiseTitle: String
-        get() = prefs.getString(KEY_DISGUISE_TITLE, DEFAULT_DISGUISE_TITLE).orEmpty()
+        get() = prefs.getString(KEY_DISGUISE_TITLE, null) ?: ctx.getString(R.string.disguise_default_title)
         set(v) = prefs.edit { putString(KEY_DISGUISE_TITLE, v) }
 
     /** 最近使ったアプリの一覧やスクリーンショットに、画面を映さない (FLAG_SECURE)。 */
@@ -57,8 +58,6 @@ class AppSettings(ctx: Context) {
 
     companion object {
         const val LEGAL_VERSION = 1
-        const val DEFAULT_DISGUISE_APP = "音楽"
-        const val DEFAULT_DISGUISE_TITLE = "再生中"
         private const val KEY_SECURE = "secure_screen"
         private const val KEY_LEGAL = "accepted_legal_version"
         private const val KEY_DISGUISE = "disguise_enabled"

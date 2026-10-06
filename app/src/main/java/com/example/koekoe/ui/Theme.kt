@@ -1,5 +1,15 @@
 package com.example.koekoe.ui
 
+import android.os.Build
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import androidx.compose.ui.res.stringResource
+import com.example.koekoe.R
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.Icons
@@ -69,6 +79,21 @@ fun brandBarColors() = TopAppBarDefaults.topAppBarColors(
     actionIconContentColor = Color.White,
 )
 
+/**
+ * 下から出るシート ([ModalBottomSheet]) の中身の先頭で呼ぶ。
+ * シートは別ウィンドウで、3 ボタン操作のとき、システムが下の帯 (ホーム・戻るボタン) に白い半透明の膜を重ねる。
+ * その膜をやめて、シートの色のまま、暗いアイコンで見えるようにする。
+ */
+@Composable
+fun SheetSystemBars() {
+    val view = LocalView.current
+    SideEffect {
+        val window = ((view as? DialogWindowProvider) ?: (view.parent as? DialogWindowProvider))?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
+        if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrandTopBar(
@@ -81,7 +106,7 @@ fun BrandTopBar(
         actions = actions,
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
             }
         },
         colors = brandBarColors(),

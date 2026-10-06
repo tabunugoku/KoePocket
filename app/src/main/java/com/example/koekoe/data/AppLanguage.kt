@@ -1,0 +1,29 @@
+package com.example.koekoe.data
+
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+
+/**
+ * アプリ内で選べる表示言語。[tag] が空なら端末の設定に合わせる。
+ * [nativeName] は各言語での表記で、翻訳しない (null は「端末の設定に合わせる」)。
+ * 選んだ言語は AppCompat が保存する (Android 13 以上はシステムの「アプリの言語」と連動)。
+ */
+enum class AppLanguage(val tag: String, val nativeName: String?) {
+    SYSTEM("", null),
+    JA("ja", "日本語"),
+    EN("en", "English"),
+    ZH_CN("zh-CN", "简体中文"),
+    ZH_TW("zh-TW", "繁體中文"),
+    KO("ko", "한국어");
+
+    companion object {
+        fun current(): AppLanguage {
+            val tags = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+            return entries.firstOrNull { it.tag.isNotEmpty() && it.tag.equals(tags, ignoreCase = true) } ?: SYSTEM
+        }
+
+        fun apply(lang: AppLanguage) {
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(lang.tag))
+        }
+    }
+}

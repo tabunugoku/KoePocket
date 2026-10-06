@@ -1,5 +1,6 @@
 package com.example.koekoe.data
 
+import com.example.koekoe.R
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
@@ -160,7 +161,7 @@ object FileStore {
     /** 設定画面に出す、保存先の表示名。 */
     fun displayName(ctx: Context, treeUri: String?): String {
         if (treeUri == null) {
-            return if (hasMediaStore) "Music/$DEFAULT_DIR_NAME (既定)" else "アプリ専用フォルダ(既定)"
+            return if (hasMediaStore) ctx.getString(R.string.dir_default_media, DEFAULT_DIR_NAME) else ctx.getString(R.string.dir_default_app)
         }
         val dir = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
         return dir?.name ?: treeUri

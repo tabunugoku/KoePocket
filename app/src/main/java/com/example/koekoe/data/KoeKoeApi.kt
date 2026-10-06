@@ -12,7 +12,7 @@ import java.io.File
 import java.net.URLEncoder
 
 /** 投稿が存在しない (削除された) ことを表す。 */
-class NotFoundException : Exception("この投稿はKoe-Koeから削除されたようです")
+class NotFoundException : Exception("not found")
 
 /** サイトへの負荷を抑えるため、HTMLリクエストの間隔に下限を設けている。 */
 class KoeKoeApi(cacheDir: File) {

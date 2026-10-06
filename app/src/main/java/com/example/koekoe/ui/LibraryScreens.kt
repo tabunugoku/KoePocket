@@ -1,5 +1,10 @@
 package com.example.koekoe.ui
 
+import androidx.compose.ui.res.stringResource
+import com.example.koekoe.R
+import android.content.Context
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -41,15 +46,15 @@ private data class LibItem(
 )
 
 /** ホーム・検索の一覧に合わせて「投稿者・再生時間・コメント数」を並べる。 */
-private fun subtitleOf(author: String?, duration: String?, comments: Int?, fallback: String = ""): String =
+private fun subtitleOf(ctx: Context, author: String?, duration: String?, comments: Int?, fallback: String = ""): String =
     listOfNotNull(
         author?.takeIf { it.isNotBlank() },
-        duration?.takeIf { it.isNotBlank() },
-        comments?.let { "コメ$it" },
+        duration?.takeIf { it.isNotBlank() }?.let { SiteText.duration(ctx, it) },
+        comments?.let { ctx.getString(R.string.comments_short, it) },
     ).joinToString("・").ifEmpty { fallback }
 
-private enum class LibSort(val label: String) {
-    NEWEST("追加が新しい順"), OLDEST("追加が古い順"), TITLE("タイトル順")
+private enum class LibSort(@StringRes val labelRes: Int) {
+    NEWEST(R.string.sort_newest), OLDEST(R.string.sort_oldest), TITLE(R.string.sort_title)
 }
 
 /** フォルダ絞り込みの特別な値。フォルダの id は 1 以上。 */
@@ -60,16 +65,17 @@ private const val FOLDER_NEW = -2L
 @Composable
 fun FavoritesScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier = Modifier) {
     val dao = app.db.dao()
+    val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val favs by dao.favorites().collectAsState(initial = emptyList())
     LibraryScreen(
         app = app,
-        title = "お気に入り",
+        title = stringResource(R.string.tab_favorites),
         items = favs.map {
-            LibItem(it.id, it.title, subtitleOf(it.author, it.duration, it.commentCount), it.addedAt, it.folderId, it.gender, it.removed)
+            LibItem(it.id, it.title, subtitleOf(ctx, it.author, it.duration, it.commentCount), it.addedAt, it.folderId, it.gender, it.removed)
         },
-        emptyText = "お気に入りはまだありません",
-        deleteLabel = "お気に入りから外す",
+        emptyText = stringResource(R.string.fav_empty),
+        deleteLabel = stringResource(R.string.fav_remove),
         history = app.history,
         historyScope = "fav",
         onOpen = onOpen,
@@ -87,12 +93,12 @@ fun DownloadsScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier =
     val list by dao.downloads().collectAsState(initial = emptyList())
     LibraryScreen(
         app = app,
-        title = "保存済み",
+        title = stringResource(R.string.tab_downloads),
         items = list.map {
-            LibItem(it.id, it.title, subtitleOf(it.author, it.duration, it.commentCount, "オフライン再生可"), it.addedAt, it.folderId, it.gender, it.removed)
+            LibItem(it.id, it.title, subtitleOf(ctx, it.author, it.duration, it.commentCount, ctx.getString(R.string.offline_playable)), it.addedAt, it.folderId, it.gender, it.removed)
         },
-        emptyText = "ダウンロード済みの音声はありません",
-        deleteLabel = "ファイルを削除",
+        emptyText = stringResource(R.string.dl_empty),
+        deleteLabel = stringResource(R.string.dl_delete),
         history = app.history,
         historyScope = "dl",
         onOpen = onOpen,
@@ -142,6 +148,8 @@ private fun LibraryScreen(
     var manageDialog by remember { mutableStateOf(false) }
     var newFolderDialog by remember { mutableStateOf<((Long) -> Unit)?>(null) }
     val selecting = selected.isNotEmpty()
+    val allLabel = stringResource(R.string.all)
+    val noneLabel = stringResource(R.string.uncategorized)
 
     // 消えたフォルダを選んだままにしない
     LaunchedEffect(folders) {
@@ -169,26 +177,26 @@ private fun LibraryScreen(
 
     Column(modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(if (selecting) "${selected.size}件を選択中" else "$title (${items.size})") },
+            title = { Text(if (selecting) stringResource(R.string.selecting_count, selected.size) else "$title (${items.size})") },
             navigationIcon = {
-                if (selecting) IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Close, "選択を解除") }
+                if (selecting) IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Close, stringResource(R.string.sel_clear)) }
             },
             actions = {
                 if (selecting) {
-                    IconButton(onClick = { selected = shown.map { it.id }.toSet() }) { Icon(Icons.Filled.SelectAll, "すべて選択") }
-                    IconButton(onClick = { moveDialog = true }) { Icon(Icons.Filled.FolderOpen, "フォルダへ移動") }
+                    IconButton(onClick = { selected = shown.map { it.id }.toSet() }) { Icon(Icons.Filled.SelectAll, stringResource(R.string.sel_all)) }
+                    IconButton(onClick = { moveDialog = true }) { Icon(Icons.Filled.FolderOpen, stringResource(R.string.move_to_folder)) }
                     IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, deleteLabel) }
                 } else {
                     IconButton(onClick = { searching = !searching; if (!searching) query = "" }) {
-                        Icon(Icons.Filled.Search, "絞り込み")
+                        Icon(Icons.Filled.Search, stringResource(R.string.filter))
                     }
-                    IconButton(onClick = { manageDialog = true }) { Icon(Icons.Filled.CreateNewFolder, "フォルダを管理") }
+                    IconButton(onClick = { manageDialog = true }) { Icon(Icons.Filled.CreateNewFolder, stringResource(R.string.manage_folders)) }
                     Box {
-                        IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, "並べ替え") }
+                        IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.sort)) }
                         DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
                             LibSort.entries.forEach { s ->
                                 DropdownMenuItem(
-                                    text = { Text(s.label) },
+                                    text = { Text(stringResource(s.labelRes)) },
                                     leadingIcon = { if (s == sort) Icon(Icons.Filled.Check, null) },
                                     onClick = { sort = s; sortMenu = false },
                                 )
@@ -203,26 +211,26 @@ private fun LibraryScreen(
         // フォルダが多くてもチップが並びきらないよう、1つのボタンから選択シート (検索つき) を開く
         if (folders.isNotEmpty() || items.any { it.folderId != null }) {
             val currentLabel = when (folderFilter) {
-                FOLDER_ALL -> "すべて"
-                FOLDER_NONE -> "未分類"
-                else -> folderNames[folderFilter] ?: "すべて"
+                FOLDER_ALL -> allLabel
+                FOLDER_NONE -> noneLabel
+                else -> folderNames[folderFilter] ?: allLabel
             }
             Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 FilterChip(
                     selected = folderFilter != FOLDER_ALL,
                     onClick = { filterSheet = true },
                     leadingIcon = { Icon(Icons.Filled.Folder, null, Modifier.size(18.dp)) },
-                    label = { Text("フォルダ: $currentLabel") },
+                    label = { Text(stringResource(R.string.folder_chip, currentLabel)) },
                     trailingIcon = {
                         if (folderFilter != FOLDER_ALL) {
-                            Icon(Icons.Filled.Close, "フォルダの絞り込みを解除", Modifier.size(18.dp).clickable { folderFilter = FOLDER_ALL })
+                            Icon(Icons.Filled.Close, stringResource(R.string.folder_filter_clear), Modifier.size(18.dp).clickable { folderFilter = FOLDER_ALL })
                         } else {
                             Icon(Icons.Filled.ArrowDropDown, null, Modifier.size(18.dp))
                         }
                     },
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("${shown.size}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(pluralStringResource(R.plurals.items_count, shown.size, shown.size), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -230,7 +238,7 @@ private fun LibraryScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("タイトルで絞り込み") },
+                placeholder = { Text(stringResource(R.string.title_filter_hint)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
@@ -251,7 +259,7 @@ private fun LibraryScreen(
             }
         } else if (shown.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text(if (items.isEmpty()) emptyText else "該当する項目がありません")
+                Text(if (items.isEmpty()) emptyText else stringResource(R.string.no_match))
             }
         } else {
             LazyColumn(Modifier.weight(1f)) {
@@ -263,7 +271,7 @@ private fun LibraryScreen(
                         supportingContent = {
                             val base = if (folderName != null) "${item.subtitle}・$folderName" else item.subtitle
                             if (item.removed) {
-                                Text("【削除済み】$base", color = MaterialTheme.colorScheme.tertiary)
+                                Text(stringResource(R.string.removed_mark, base), color = MaterialTheme.colorScheme.tertiary)
                             } else {
                                 Text(base)
                             }
@@ -297,21 +305,21 @@ private fun LibraryScreen(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("${selected.size}件の${deleteLabel}") },
-            text = { Text("選択した項目に対して実行します。よろしいですか？") },
+            title = { Text(stringResource(R.string.confirm_title, deleteLabel, selected.size)) },
+            text = { Text(stringResource(R.string.confirm_body)) },
             confirmButton = {
-                TextButton(onClick = { onDelete(selected); selected = emptySet(); confirmDelete = false }) { Text("実行") }
+                TextButton(onClick = { onDelete(selected); selected = emptySet(); confirmDelete = false }) { Text(stringResource(R.string.run)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 
     if (filterSheet) {
         FolderSheet(
-            title = "フォルダで絞り込み",
+            title = stringResource(R.string.folder_filter_title),
             entries = buildList {
-                add(FolderEntry(FOLDER_ALL, "すべて", items.size, Icons.Filled.Folder, special = true))
-                add(FolderEntry(FOLDER_NONE, "未分類", items.count { it.folderId == null }, Icons.Filled.FolderOff, special = true))
+                add(FolderEntry(FOLDER_ALL, allLabel, items.size, Icons.Filled.Folder, special = true))
+                add(FolderEntry(FOLDER_NONE, noneLabel, items.count { it.folderId == null }, Icons.Filled.FolderOff, special = true))
                 folders.forEach { f -> add(FolderEntry(f.id, f.name, items.count { it.folderId == f.id }, Icons.Filled.Folder)) }
             },
             current = folderFilter,
@@ -323,14 +331,14 @@ private fun LibraryScreen(
 
     if (moveDialog) {
         FolderSheet(
-            title = "${selected.size}件をフォルダへ移動",
+            title = stringResource(R.string.move_title, selected.size),
             entries = buildList {
-                add(FolderEntry(FOLDER_NEW, "新しいフォルダを作って移動", null, Icons.Filled.CreateNewFolder, special = true))
-                add(FolderEntry(FOLDER_NONE, "未分類", null, Icons.Filled.FolderOff, special = true))
+                add(FolderEntry(FOLDER_NEW, stringResource(R.string.new_folder_move), null, Icons.Filled.CreateNewFolder, special = true))
+                add(FolderEntry(FOLDER_NONE, noneLabel, null, Icons.Filled.FolderOff, special = true))
                 folders.forEach { f -> add(FolderEntry(f.id, f.name, null, Icons.Filled.Folder)) }
             },
             current = null,
-            note = if (app.settings.syncFolders) "お気に入りと保存済みのフォルダは同期されます" else null,
+            note = if (app.settings.syncFolders) stringResource(R.string.sync_note) else null,
             onPick = { picked ->
                 val ids = selected
                 moveDialog = false
@@ -357,7 +365,7 @@ private fun LibraryScreen(
 
     newFolderDialog?.let { done ->
         NameDialog(
-            title = "新しいフォルダ",
+            title = stringResource(R.string.new_folder),
             initial = "",
             onDismiss = { newFolderDialog = null },
             onOk = { name -> scope.launch { done(app.library.createFolder(name)) }; newFolderDialog = null },
@@ -395,6 +403,7 @@ private fun FolderSheet(
     }
     val folderCount = entries.count { !it.special }
     ModalBottomSheet(onDismissRequest = onDismiss) {
+        SheetSystemBars()
         Column(Modifier.fillMaxHeight(0.8f).padding(horizontal = 16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             if (note != null) Text(note, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp))
@@ -402,13 +411,13 @@ private fun FolderSheet(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("フォルダ名で検索 (${folderCount}件)") },
+                    placeholder = { Text(stringResource(R.string.folder_search_hint, folderCount)) },
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Filled.Search, null) },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
             }
-            LazyColumn(Modifier.weight(1f)) {
+            LazyColumn(Modifier.weight(1f), contentPadding = WindowInsets.navigationBars.asPaddingValues()) {
                 items(shown, key = { it.id }) { e ->
                     ListItem(
                         headlineContent = { Text(e.label) },
@@ -416,14 +425,14 @@ private fun FolderSheet(
                         trailingContent = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 e.count?.let { Text("$it", style = MaterialTheme.typography.labelMedium) }
-                                if (e.id == current) Icon(Icons.Filled.Check, "選択中", Modifier.padding(start = 8.dp))
+                                if (e.id == current) Icon(Icons.Filled.Check, stringResource(R.string.selected_mark), Modifier.padding(start = 8.dp))
                             }
                         },
                         modifier = Modifier.clickable { onPick(e.id) },
                     )
                 }
                 if (shown.none { !it.special } && q.isNotEmpty()) item {
-                    Text("該当するフォルダがありません", Modifier.padding(16.dp))
+                    Text(stringResource(R.string.no_folder_match), Modifier.padding(16.dp))
                 }
             }
         }
@@ -458,32 +467,32 @@ private fun ManageFoldersDialog(
     var deleting by remember { mutableStateOf<Folder?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("フォルダの管理") },
+        title = { Text(stringResource(R.string.manage_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                if (folders.isEmpty()) Text("フォルダはまだありません", modifier = Modifier.padding(vertical = 8.dp))
+                if (folders.isEmpty()) Text(stringResource(R.string.no_folders), modifier = Modifier.padding(vertical = 8.dp))
                 folders.forEach { f ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Folder, null, tint = MaterialTheme.colorScheme.primary)
                         Text(f.name, modifier = Modifier.weight(1f).padding(horizontal = 12.dp), maxLines = 1)
-                        IconButton(onClick = { renaming = f }) { Icon(Icons.Filled.Edit, "名前を変更") }
-                        IconButton(onClick = { deleting = f }) { Icon(Icons.Filled.Delete, "フォルダを削除") }
+                        IconButton(onClick = { renaming = f }) { Icon(Icons.Filled.Edit, stringResource(R.string.rename)) }
+                        IconButton(onClick = { deleting = f }) { Icon(Icons.Filled.Delete, stringResource(R.string.delete_folder)) }
                     }
                 }
-                MoveRow("新しいフォルダ", Icons.Filled.CreateNewFolder) { creating = true }
+                MoveRow(stringResource(R.string.new_folder), Icons.Filled.CreateNewFolder) { creating = true }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
     )
-    if (creating) NameDialog("新しいフォルダ", "", { creating = false }) { onCreate(it); creating = false }
-    renaming?.let { f -> NameDialog("名前を変更", f.name, { renaming = null }) { onRename(f.id, it); renaming = null } }
+    if (creating) NameDialog(stringResource(R.string.new_folder), "", { creating = false }) { onCreate(it); creating = false }
+    renaming?.let { f -> NameDialog(stringResource(R.string.rename), f.name, { renaming = null }) { onRename(f.id, it); renaming = null } }
     deleting?.let { f ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("「${f.name}」を削除") },
-            text = { Text("中の項目は削除されず、未分類に戻ります。") },
-            confirmButton = { TextButton(onClick = { onDelete(f.id); deleting = null }) { Text("削除") } },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("キャンセル") } },
+            title = { Text(stringResource(R.string.delete_folder_title, f.name)) },
+            text = { Text(stringResource(R.string.delete_folder_body)) },
+            confirmButton = { TextButton(onClick = { onDelete(f.id); deleting = null }) { Text(stringResource(R.string.delete)) } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -499,10 +508,10 @@ private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, on
                 value = name,
                 onValueChange = { if (it.length <= 30) name = it },
                 singleLine = true,
-                placeholder = { Text("フォルダ名") },
+                placeholder = { Text(stringResource(R.string.folder_name_hint)) },
             )
         },
         confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { onOk(name) }) { Text("OK") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

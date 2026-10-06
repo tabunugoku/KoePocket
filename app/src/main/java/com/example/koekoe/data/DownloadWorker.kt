@@ -1,5 +1,6 @@
 package com.example.koekoe.data
 
+import com.example.koekoe.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -73,11 +74,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     private fun foregroundInfo(app: KoeKoeApp, id: Long): ForegroundInfo {
         val ctx = applicationContext
         val nm = ctx.getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "ダウンロード", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, ctx.getString(R.string.notif_channel_download), NotificationManager.IMPORTANCE_LOW))
         // 通知の偽装が有効なら、再生通知と同じく表示を差し替える
         val s = app.settings
         val disguised = s.disguiseEnabled
-        val title = if (disguised) s.disguiseTitle.ifBlank { s.disguiseAppName } else "ダウンロード中"
+        val title = if (disguised) s.disguiseTitle.ifBlank { s.disguiseAppName } else ctx.getString(R.string.notif_downloading)
         val n = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle(title)

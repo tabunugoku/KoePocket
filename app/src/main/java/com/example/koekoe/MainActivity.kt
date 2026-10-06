@@ -1,9 +1,12 @@
 package com.example.koekoe
 
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.annotation.StringRes
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.ui.graphics.Color
@@ -11,6 +14,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -35,36 +39,46 @@ import com.example.koekoe.data.Genre
 import com.example.koekoe.data.KoeKoeApi
 import com.example.koekoe.ui.*
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val navy = Navy.toArgb()
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(navy), navigationBarStyle = SystemBarStyle.dark(navy))
+        // 3 ボタン操作のとき、システムが下の帯に白い半透明の膜を重ねないようにする (下から出るシートの表示中に白く見える)
+        if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
         val app = application as KoeKoeApp
         setSecureScreen(this, app.settings.secureScreen)
         app.player // 再生サービスへの接続を先に開始する
         setContent {
             KoePocketTheme {
-                var accepted by remember { mutableStateOf(app.settings.acceptedLegalVersion >= AppSettings.LEGAL_VERSION) }
-                if (!accepted) {
-                    ConsentGate(
-                        onAccept = { app.settings.acceptedLegalVersion = AppSettings.LEGAL_VERSION; accepted = true },
-                        onDecline = { finishAndRemoveTask() },
-                    )
-                } else {
-                    if (Build.VERSION.SDK_INT >= 33) {
-                        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-                        LaunchedEffect(Unit) { launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                Box(Modifier.fillMaxSize()) {
+                    var accepted by remember { mutableStateOf(app.settings.acceptedLegalVersion >= AppSettings.LEGAL_VERSION) }
+                    if (!accepted) {
+                        ConsentGate(
+                            onAccept = { app.settings.acceptedLegalVersion = AppSettings.LEGAL_VERSION; accepted = true },
+                            onDecline = { finishAndRemoveTask() },
+                        )
+                    } else {
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+                            LaunchedEffect(Unit) { launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                        }
+                        AppRoot(app)
                     }
-                    AppRoot(app)
+                    // ナビゲーションバー (ホーム・戻るボタン) の背面を濃紺にする。タブのない画面でも、白地に白いアイコンにならないように
+                    Spacer(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .windowInsetsBottomHeight(WindowInsets.navigationBars).background(Navy),
+                    )
                 }
             }
         }
     }
 }
 
-private enum class NavTab(val route: String, val label: String) {
-    HOME("home", "ホーム"), SEARCH("search", "検索"), FAVORITES("favorites", "お気に入り"), DOWNLOADS("downloads", "保存済み")
+private enum class NavTab(val route: String, @StringRes val label: Int) {
+    HOME("home", R.string.tab_home), SEARCH("search", R.string.tab_search),
+    FAVORITES("favorites", R.string.tab_favorites), DOWNLOADS("downloads", R.string.tab_downloads)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,7 +91,8 @@ private fun AppRoot(app: KoeKoeApp) {
     val openDetail = { id: Long -> nav.navigate("detail/$id") }
     // タイトルとパスは、記号を含むので Base64(URL セーフ) にしてルートに載せる
     val openList = { title: String, path: String -> nav.navigate("list/${b64(title)}/${b64(path)}") }
-    val openTag = { tag: String -> openList("タグ: $tag", KoeKoeApi.tagPath(tag)) }
+    val ctx = LocalContext.current
+    val openTag = { tag: String -> openList(ctx.getString(R.string.tag_prefix, tag), KoeKoeApi.tagPath(tag)) }
 
     val showTabs = NavTab.entries.any { t -> dest?.hierarchy?.any { it.route == t.route } == true }
     Scaffold(
@@ -94,7 +109,7 @@ private fun AppRoot(app: KoeKoeApp) {
                             Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(player.title, maxLines = 1, modifier = Modifier.weight(1f))
                                 IconButton(onClick = { if (player.isPlaying) app.player.pause() else app.player.resume() }) {
-                                    Icon(if (player.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "再生/一時停止", tint = Accent)
+                                    Icon(if (player.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, stringResource(R.string.play_pause), tint = Accent)
                                 }
                             }
                             MiniSeekBar(app, player.currentId, player.isPlaying)
@@ -116,10 +131,10 @@ private fun AppRoot(app: KoeKoeApp) {
                                 icon = {
                                     Icon(
                                         when (t) { NavTab.HOME -> Icons.Filled.Home; NavTab.SEARCH -> Icons.Filled.Search; NavTab.FAVORITES -> Icons.Filled.Favorite; NavTab.DOWNLOADS -> Icons.Filled.Download },
-                                        t.label,
+                                        stringResource(t.label),
                                     )
                                 },
-                                label = { Text(t.label) },
+                                label = { Text(stringResource(t.label)) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = Navy,
                                     selectedTextColor = Accent,
@@ -169,14 +184,14 @@ private fun HomeScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, onSettings: () ->
     var showTagPicker by remember { mutableStateOf(false) }
     Column {
         BrandTopBar("KoePocket", actions = {
-            IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "設定") }
+            IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
         })
         TabRow(selectedTabIndex = selected, containerColor = Navy, contentColor = Accent) {
             Category.entries.forEachIndexed { i, c ->
                 Tab(
                     selected = i == selected,
                     onClick = { selected = i },
-                    text = { Text(c.label) },
+                    text = { Text(stringResource(c.labelRes)) },
                     selectedContentColor = Accent,
                     unselectedContentColor = OnNavyMuted,
                 )
@@ -189,7 +204,7 @@ private fun HomeScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, onSettings: () ->
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(Genre.entries) { g ->
-                FilterChip(selected = tag == null && g == genre, onClick = { genre = g; tag = null }, label = { Text(g.label) })
+                FilterChip(selected = tag == null && g == genre, onClick = { genre = g; tag = null }, label = { Text(stringResource(g.labelRes)) })
             }
         }
         // タグは数が多いので、チップを並べず選択画面(検索つき)から選ぶ
@@ -198,9 +213,9 @@ private fun HomeScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, onSettings: () ->
                 selected = tag != null,
                 onClick = { showTagPicker = true },
                 leadingIcon = { Icon(Icons.Filled.Sell, null, Modifier.size(18.dp)) },
-                label = { Text(if (tag != null) "タグ: $tag" else "タグで絞り込み") },
+                label = { Text(tag?.let { stringResource(R.string.tag_prefix, it) } ?: stringResource(R.string.tag_filter)) },
                 trailingIcon = if (tag != null) {
-                    { Icon(Icons.Filled.Close, "タグを解除", Modifier.size(18.dp).clickable { tag = null }) }
+                    { Icon(Icons.Filled.Close, stringResource(R.string.tag_clear), Modifier.size(18.dp).clickable { tag = null }) }
                 } else null,
             )
         }
@@ -265,21 +280,22 @@ private fun TagPickerSheet(app: KoeKoeApp, current: String?, onPick: (String) ->
         }
     }
     ModalBottomSheet(onDismissRequest = onDismiss) {
+        SheetSystemBars()
         Column(Modifier.fillMaxHeight(0.8f).padding(horizontal = 16.dp)) {
-            Text("タグで絞り込み", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.tag_filter), style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("タグを検索 / 入力") },
+                placeholder = { Text(stringResource(R.string.tag_search_hint)) },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, null) },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             )
-            LazyColumn(Modifier.weight(1f)) {
+            LazyColumn(Modifier.weight(1f), contentPadding = WindowInsets.navigationBars.asPaddingValues()) {
                 // 一覧にないタグも、入力してそのまま使える
                 if (q.isNotEmpty() && q !in tags) item {
                     ListItem(
-                        headlineContent = { Text("「$q」で絞り込み") },
+                        headlineContent = { Text(stringResource(R.string.tag_use, q)) },
                         leadingContent = { Icon(Icons.Filled.Search, null) },
                         modifier = Modifier.clickable { onPick(q) },
                     )
@@ -287,7 +303,7 @@ private fun TagPickerSheet(app: KoeKoeApp, current: String?, onPick: (String) ->
                 items(matches) { t ->
                     ListItem(
                         headlineContent = { Text(t) },
-                        trailingContent = { if (t == current) Icon(Icons.Filled.Check, "選択中") },
+                        trailingContent = { if (t == current) Icon(Icons.Filled.Check, stringResource(R.string.selected_mark)) },
                         modifier = Modifier.clickable { onPick(t) },
                     )
                 }
@@ -300,8 +316,8 @@ private fun TagPickerSheet(app: KoeKoeApp, current: String?, onPick: (String) ->
                                 CircularProgressIndicator(Modifier.size(24.dp))
                             }
                         }
-                        failed && tags.isEmpty() -> Text("タグを読み込めませんでした。入力して絞り込めます。", Modifier.padding(16.dp))
-                        failed -> TextButton(onClick = { hasMore = true; loadMore() }) { Text("続きを読み込めませんでした。再試行") }
+                        failed && tags.isEmpty() -> Text(stringResource(R.string.tag_load_failed), Modifier.padding(16.dp))
+                        failed -> TextButton(onClick = { hasMore = true; loadMore() }) { Text(stringResource(R.string.tag_more_failed)) }
                     }
                 }
             }

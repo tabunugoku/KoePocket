@@ -1,5 +1,7 @@
 package com.example.koekoe.ui
 
+import androidx.compose.ui.res.stringResource
+import com.example.koekoe.R
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -30,6 +32,7 @@ import androidx.work.WorkManager
 import com.example.koekoe.KoeKoeApp
 import com.example.koekoe.data.DownloadWorker
 import com.example.koekoe.data.FileStore
+import com.example.koekoe.data.Genre
 import com.example.koekoe.data.NotFoundException
 import com.example.koekoe.data.VoiceComment
 import com.example.koekoe.data.VoiceDetail
@@ -67,7 +70,7 @@ fun DetailScreen(
             detail = app.api.detail(id)
             offline = false
             detail?.let { app.library.refresh(it) }
-            if (detail == null) error = "音声が見つかりません"
+            if (detail == null) error = ctx.getString(R.string.voice_not_found)
         } catch (e: Exception) {
             val gone = e is NotFoundException
             if (gone) {
@@ -81,7 +84,7 @@ fun DetailScreen(
                 detail = VoiceDetail(id, local.title, FileStore.playUri(local.path), local.duration.orEmpty(), emptyList(), emptyList(), author = local.author.orEmpty())
                 offline = true
             } else {
-                error = if (e is java.io.IOException) "通信できません。ネットワークを確認してください" else e.message ?: "読み込みに失敗しました"
+                error = errorMessage(ctx, e)
             }
         }
     }
@@ -109,8 +112,8 @@ fun DetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("音声") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
+                title = { Text(stringResource(R.string.voice_title)) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) } },
                 colors = brandBarColors(),
                 actions = {
                     val d = detail
@@ -129,10 +132,10 @@ fun DetailScreen(
                                 }
                             }
                         }) {
-                            Icon(if (fav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, "お気に入り")
+                            Icon(if (fav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, stringResource(R.string.tab_favorites))
                         }
                         when {
-                            downloaded != null -> IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.DownloadDone, "ダウンロード済み(タップで削除)") }
+                            downloaded != null -> IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.DownloadDone, stringResource(R.string.downloaded_tap_delete)) }
                             downloading -> Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (pct >= 0) {
                                     Text("$pct%", style = MaterialTheme.typography.labelMedium)
@@ -144,7 +147,7 @@ fun DetailScreen(
                                 Spacer(Modifier.width(14.dp))
                             }
                             else -> IconButton(onClick = { DownloadWorker.enqueue(ctx, id) }) {
-                                Icon(Icons.Filled.Download, "ダウンロード")
+                                Icon(Icons.Filled.Download, stringResource(R.string.download))
                             }
                         }
                     }
@@ -169,8 +172,8 @@ fun DetailScreen(
         if (confirmDelete && downloaded != null) {
             AlertDialog(
                 onDismissRequest = { confirmDelete = false },
-                title = { Text("保存した音声を削除") },
-                text = { Text("端末に保存したファイルを削除します。よろしいですか？") },
+                title = { Text(stringResource(R.string.delete_saved_title)) },
+                text = { Text(stringResource(R.string.delete_saved_msg)) },
                 confirmButton = {
                     TextButton(onClick = {
                         confirmDelete = false
@@ -178,9 +181,9 @@ fun DetailScreen(
                             FileStore.delete(ctx, downloaded.path)
                             dao.removeDownload(id)
                         }
-                    }) { Text("削除") }
+                    }) { Text(stringResource(R.string.delete)) }
                 },
-                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("キャンセル") } },
+                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) } },
             )
         }
         val d = detail
@@ -188,7 +191,7 @@ fun DetailScreen(
             Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
                 if (error != null) Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(error!!, modifier = Modifier.padding(horizontal = 24.dp), textAlign = TextAlign.Center)
-                    TextButton(onClick = { reload++ }) { Text("再読み込み") }
+                    TextButton(onClick = { reload++ }) { Text(stringResource(R.string.reload)) }
                 } else CircularProgressIndicator()
             }
             return@Scaffold
@@ -202,21 +205,25 @@ fun DetailScreen(
             if (d.authorPath != null || d.genrePath != null) item {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (d.authorPath != null && d.author.isNotEmpty()) AssistChip(
-                        onClick = { onList("投稿者: ${d.author}", d.authorPath) },
+                        onClick = { onList(ctx.getString(R.string.author_prefix, d.author), d.authorPath) },
                         leadingIcon = { Icon(Icons.Filled.Person, null, Modifier.size(18.dp)) },
                         label = { Text(d.author) },
                     )
-                    if (d.genrePath != null && d.genre.isNotEmpty()) AssistChip(
-                        onClick = { onList("ジャンル: ${d.genre}", d.genrePath) },
-                        leadingIcon = { Icon(Icons.Filled.Mic, null, Modifier.size(18.dp)) },
-                        label = { Text(d.genre) },
-                    )
+                    if (d.genrePath != null && d.genre.isNotEmpty()) {
+                        // サイトの日本語のジャンル名は、アプリ側の訳に置き換える (対応するものがなければそのまま)
+                        val genreName = Genre.fromPath(d.genrePath)?.let { stringResource(it.labelRes) } ?: d.genre
+                        AssistChip(
+                            onClick = { onList(ctx.getString(R.string.genre_prefix, genreName), d.genrePath) },
+                            leadingIcon = { Icon(Icons.Filled.Mic, null, Modifier.size(18.dp)) },
+                            label = { Text(genreName) },
+                        )
+                    }
                 }
             }
             if (offline) item {
                 Text(
-                    if (removedOnSite) "この投稿はKoe-Koeから削除されました。保存済みの音声のみ再生できます"
-                    else "オフライン表示です(保存済みの音声のみ再生できます)",
+                    if (removedOnSite) stringResource(R.string.offline_removed)
+                    else stringResource(R.string.offline_view),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (removedOnSite) MaterialTheme.colorScheme.tertiary else Color.Unspecified,
                 )
@@ -231,7 +238,7 @@ fun DetailScreen(
                         onTextLayout = { if (!descExpanded) descOverflow = it.hasVisualOverflow },
                     )
                     if (descOverflow || descExpanded) {
-                        TextButton(onClick = { descExpanded = !descExpanded }) { Text(if (descExpanded) "閉じる" else "続きを読む") }
+                        TextButton(onClick = { descExpanded = !descExpanded }) { Text(if (descExpanded) stringResource(R.string.close) else stringResource(R.string.read_more)) }
                     }
                 }
             }
@@ -242,7 +249,7 @@ fun DetailScreen(
             }
             if (!offline) item {
                 HorizontalDivider(Modifier.padding(top = 4.dp))
-                Text("コメント (${d.comments.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+                Text(stringResource(R.string.comments_header, d.comments.size), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
             }
             // 投稿者本人のコメントは色を変えて見分けられるようにする (「名無し」は他人と区別できないので対象外)
             items(d.comments.take(commentsShown)) { c ->
@@ -250,7 +257,7 @@ fun DetailScreen(
             }
             if (d.comments.size > commentsShown) item {
                 OutlinedButton(onClick = { commentsShown += COMMENTS_PAGE }, modifier = Modifier.fillMaxWidth()) {
-                    Text("もっと見る (残り${d.comments.size - commentsShown}件)")
+                    Text(stringResource(R.string.show_more_comments, d.comments.size - commentsShown))
                 }
             }
         }
@@ -277,7 +284,7 @@ private fun CommentCard(c: VoiceComment, isOwner: Boolean) {
                     if (isOwner) {
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "投稿者",
+                            stringResource(R.string.owner_label),
                             style = MaterialTheme.typography.labelSmall,
                             color = Navy,
                             fontWeight = FontWeight.Bold,
@@ -286,7 +293,7 @@ private fun CommentCard(c: VoiceComment, isOwner: Boolean) {
                     }
                 }
                 if (c.postedAt.isNotEmpty()) {
-                    Text(c.postedAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(SiteText.ago(LocalContext.current, c.postedAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Text(c.body, style = MaterialTheme.typography.bodyMedium)
@@ -313,7 +320,7 @@ private fun PlayerBar(
             FilledIconButton(
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = Navy),
                 onClick = onToggle,
-            ) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, "再生/一時停止") }
+            ) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, stringResource(R.string.play_pause)) }
             Slider(
                 value = pos.coerceIn(0, maxOf(dur, 1)).toFloat(),
                 onValueChange = { onSeekPreview(it.toLong()) },
@@ -323,7 +330,7 @@ private fun PlayerBar(
                 colors = seekColors(),
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             )
-            TimeLabel(if (dur > 0) "${formatTime(pos)} / ${formatTime(dur)}" else fallbackDuration)
+            TimeLabel(if (dur > 0) "${formatTime(pos)} / ${formatTime(dur)}" else SiteText.duration(LocalContext.current, fallbackDuration))
         }
     }
 }

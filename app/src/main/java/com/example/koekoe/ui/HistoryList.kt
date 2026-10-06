@@ -1,5 +1,7 @@
 package com.example.koekoe.ui
 
+import androidx.compose.ui.res.stringResource
+import com.example.koekoe.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -23,8 +25,8 @@ fun HistoryList(
     if (history.isEmpty()) return
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("履歴", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-            TextButton(onClick = onClear) { Text("すべて削除") }
+            Text(stringResource(R.string.history), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            TextButton(onClick = onClear) { Text(stringResource(R.string.clear_all)) }
         }
         history.forEach { q ->
             Row(
@@ -33,7 +35,7 @@ fun HistoryList(
             ) {
                 Icon(Icons.Filled.History, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(q, modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 12.dp), maxLines = 1)
-                IconButton(onClick = { onRemove(q) }) { Icon(Icons.Filled.Close, "履歴から削除") }
+                IconButton(onClick = { onRemove(q) }) { Icon(Icons.Filled.Close, stringResource(R.string.history_remove)) }
             }
         }
     }

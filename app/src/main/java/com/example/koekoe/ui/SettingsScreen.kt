@@ -1,5 +1,8 @@
 package com.example.koekoe.ui
 
+import androidx.compose.ui.res.stringResource
+import com.example.koekoe.R
+import com.example.koekoe.data.AppLanguage
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -51,17 +54,19 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().navigationBarsPadding()) {
-        BrandTopBar("設定", onBack = onBack)
+        BrandTopBar(stringResource(R.string.settings), onBack = onBack)
         Column(Modifier.verticalScroll(rememberScrollState())) {
+            LanguageSetting()
+            HorizontalDivider()
             SettingSwitch(
-                title = "お気に入りに入れたら自動でダウンロード",
-                description = "お気に入りに追加した音声を、自動で保存済みに入れます。",
+                title = stringResource(R.string.set_auto_dl_title),
+                description = stringResource(R.string.set_auto_dl_desc),
                 checked = autoDownload,
             ) { autoDownload = it; settings.autoDownloadOnFavorite = it }
             HorizontalDivider()
             SettingSwitch(
-                title = "お気に入りとフォルダ分けを同期",
-                description = "お気に入りと保存済みで、同じ音声は同じフォルダに入ります。片方で移動すると、もう片方も移動します。",
+                title = stringResource(R.string.set_sync_title),
+                description = stringResource(R.string.set_sync_desc),
                 checked = syncFolders,
             ) {
                 syncFolders = it
@@ -70,7 +75,7 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
             }
             HorizontalDivider()
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("ダウンロード先", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.set_dl_dir), style = MaterialTheme.typography.bodyLarge)
                 Text(
                     FileStore.displayName(ctx, treeUri),
                     style = MaterialTheme.typography.bodyMedium,
@@ -78,44 +83,44 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 Text(
-                    "変更後にダウンロードする音声から適用されます。すでに保存した音声は移動しません。",
+                    stringResource(R.string.set_dl_dir_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { picker.launch(null) }) { Text("フォルダを選ぶ") }
+                    Button(onClick = { picker.launch(null) }) { Text(stringResource(R.string.choose_folder)) }
                     if (treeUri != null) OutlinedButton(onClick = { releaseTree(ctx, treeUri); settings.downloadTreeUri = null; treeUri = null }) {
-                        Text("既定に戻す")
+                        Text(stringResource(R.string.reset_default))
                     }
                 }
             }
             HorizontalDivider()
             SettingSwitch(
-                title = "通知の表示を偽装",
-                description = "再生通知に出るアプリ名と音声タイトルを、下の文字に置き換えます。次に通知が更新されたときから反映されます。",
+                title = stringResource(R.string.set_disguise_title),
+                description = stringResource(R.string.set_disguise_desc),
                 checked = disguise,
             ) { disguise = it; settings.disguiseEnabled = it }
             if (disguise) {
                 OutlinedTextField(
                     value = disguiseApp,
                     onValueChange = { disguiseApp = it; settings.disguiseAppName = it },
-                    label = { Text("通知のアプリ名") },
+                    label = { Text(stringResource(R.string.disguise_app_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 )
                 OutlinedTextField(
                     value = disguiseTitle,
                     onValueChange = { disguiseTitle = it; settings.disguiseTitle = it },
-                    label = { Text("通知の音声タイトル") },
+                    label = { Text(stringResource(R.string.disguise_title_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             HorizontalDivider()
             SettingSwitch(
-                title = "画面を隠す",
-                description = "最近使ったアプリの一覧に画面を映さず、スクリーンショットや画面録画も止めます。",
+                title = stringResource(R.string.set_secure_title),
+                description = stringResource(R.string.set_secure_desc),
                 checked = secure,
             ) {
                 secure = it
@@ -124,9 +129,9 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
             }
             HorizontalDivider()
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("キャッシュ", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.set_cache), style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "閲覧した一覧や詳細ページの一時データ (最大20MB) を端末に残しています。",
+                    stringResource(R.string.set_cache_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
@@ -137,17 +142,50 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
                             withContext(Dispatchers.IO) { runCatching { app.api.client.cache?.evictAll() } }
                             cacheCleared = true
                         }
-                    }) { Text("キャッシュを削除") }
-                    if (cacheCleared) Text("削除しました", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp))
+                    }) { Text(stringResource(R.string.clear_cache)) }
+                    if (cacheCleared) Text(stringResource(R.string.cache_cleared), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp))
                 }
             }
             HorizontalDivider()
             Text(
-                "利用上の注意・プライバシー",
+                stringResource(R.string.legal_link),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.fillMaxWidth().clickable(onClick = onLegal).padding(16.dp),
             )
         }
+    }
+}
+
+/** 表示言語の選択。選ぶとすぐに画面が切り替わる (端末の言語設定は変えない)。 */
+@Composable
+private fun LanguageSetting() {
+    var open by remember { mutableStateOf(false) }
+    val current = AppLanguage.current()
+    val systemLabel = stringResource(R.string.lang_system)
+    val label = { l: AppLanguage -> l.nativeName ?: systemLabel }
+    Column(Modifier.fillMaxWidth().clickable { open = true }.padding(16.dp)) {
+        Text(stringResource(R.string.set_language), style = MaterialTheme.typography.bodyLarge)
+        Text(label(current), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
+    }
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.set_language)) },
+            text = {
+                Column {
+                    AppLanguage.entries.forEach { l ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { open = false; if (l != current) AppLanguage.apply(l) }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = l == current, onClick = null)
+                            Text(label(l), modifier = Modifier.padding(start = 12.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.close)) } },
+        )
     }
 }
 

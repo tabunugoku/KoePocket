@@ -1,5 +1,8 @@
 package com.example.koekoe.ui
 
+import androidx.compose.ui.res.stringResource
+import com.example.koekoe.R
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -23,8 +26,8 @@ import com.example.koekoe.data.KoeKoeApi
 private const val HISTORY_SCOPE = "search"
 
 /** 検索で絞り込める性別。[key] は一覧の項目の gender (icon_female 等) と、[g] はサイトの検索の g パラメータ。 */
-private enum class SearchGender(val label: String, val key: String, val g: Int) {
-    FEMALE("女性", "female", 1), MALE("男性", "male", 2), COUPLE("カップル", "couple", 3)
+private enum class SearchGender(@StringRes val labelRes: Int, val key: String, val g: Int) {
+    FEMALE(R.string.cat_female, "female", 1), MALE(R.string.cat_male, "male", 2), COUPLE(R.string.cat_couple, "couple", 3)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -45,16 +48,16 @@ fun SearchScreen(app: KoeKoeApp, onOpen: (Long) -> Unit) {
     val selected = SearchGender.entries.filter { genderBits and (1 shl it.ordinal) != 0 }
 
     Column(Modifier.fillMaxSize()) {
-        BrandTopBar("検索")
+        BrandTopBar(stringResource(R.string.tab_search))
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
-            placeholder = { Text("キーワードを検索") },
+            placeholder = { Text(stringResource(R.string.keyword_hint)) },
             singleLine = true,
             leadingIcon = { Icon(Icons.Filled.Search, null) },
             trailingIcon = {
                 if (input.isNotEmpty()) IconButton(onClick = { input = ""; submitted = "" }) {
-                    Icon(Icons.Filled.Clear, "クリア")
+                    Icon(Icons.Filled.Clear, stringResource(R.string.clear))
                 }
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -71,7 +74,7 @@ fun SearchScreen(app: KoeKoeApp, onOpen: (Long) -> Unit) {
                 FilterChip(
                     selected = on,
                     onClick = { genderBits = genderBits xor (1 shl gnd.ordinal) },
-                    label = { Text(gnd.label) },
+                    label = { Text(stringResource(gnd.labelRes)) },
                     leadingIcon = if (on) {
                         { Icon(Icons.Filled.Check, null, Modifier.size(18.dp)) }
                     } else null,
@@ -84,7 +87,7 @@ fun SearchScreen(app: KoeKoeApp, onOpen: (Long) -> Unit) {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 if (history.isEmpty()) {
                     Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                        Text("キーワードを入力して検索します")
+                        Text(stringResource(R.string.search_prompt))
                     }
                 } else {
                     HistoryList(
