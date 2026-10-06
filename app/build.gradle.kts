@@ -12,7 +12,7 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.example.koekoe"
+    namespace = "app.tabunugoku.koepocket"
     compileSdk = 35
     defaultConfig {
         applicationId = "app.tabunugoku.koepocket"
