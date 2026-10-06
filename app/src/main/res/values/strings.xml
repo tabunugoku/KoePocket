@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">KoePocket</string>
+    <string name="app_name" translatable="false">KoePocket</string>
     <string name="back">戻る</string>
     <string name="cancel">キャンセル</string>
     <string name="delete">削除</string>

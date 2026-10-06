@@ -17,6 +17,7 @@ import app.tabunugoku.koepocket.R
 
 data class PlayerState(val currentId: Long? = null, val title: String = "", val isPlaying: Boolean = false)
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerConnection(private val ctx: Context) {
     private var controller: MediaController? = null
     private val _state = MutableStateFlow(PlayerState())

@@ -7,7 +7,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.SUBSTITUTE_NOTIFICATION_APP_NAME" />
+    <!-- 通知の偽装用。一般アプリには付与されない端末が多いが、付与されたときだけ効けばよいので宣言は残す -->
+    <uses-permission android:name="android.permission.SUBSTITUTE_NOTIFICATION_APP_NAME" tools:ignore="ProtectedPermissions" />
 
     <application
         android:name=".KoeKoeApp"
