@@ -18,7 +18,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.flow.MutableSharedFlow
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -102,6 +104,20 @@ class ListViewModel(
 private const val MIN_NEW = 8
 private const val MAX_PAGES = 6
 
+/** 下部のタブを、選択中にもう一度タップしたことを各画面へ伝える。値はタブのルート。 */
+object TabReselect {
+    val events = MutableSharedFlow<String>(extraBufferCapacity = 1)
+}
+
+/** [route] のタブが再タップされたら、[state] の一覧を先頭へ戻す。[route] が null なら何もしない。 */
+@Composable
+fun ScrollToTopOnReselect(route: String?, state: LazyListState) {
+    if (route == null) return
+    LaunchedEffect(route, state) {
+        TabReselect.events.collect { if (it == route) state.scrollToItem(0) }
+    }
+}
+
 /** 読み込みの失敗を、利用者に見せる文言にする。 */
 fun errorMessage(ctx: Context, e: Exception): String = when (e) {
     is NotFoundException -> ctx.getString(R.string.post_removed)
@@ -121,11 +137,13 @@ fun VoiceListScreen(
     onOpen: (Long) -> Unit,
     modifier: Modifier = Modifier,
     genders: Set<String> = emptySet(),
+    reselectRoute: String? = null,
 ) {
     val key = path + "|" + genders.sorted().joinToString(",")
     val vm: ListViewModel = viewModel(key = key, factory = viewModelFactory { initializer { ListViewModel(app, path, genders) } })
     val ctx = LocalContext.current
     val state = rememberLazyListState()
+    ScrollToTopOnReselect(reselectRoute, state)
     val nearEnd by remember(vm, state) { derivedStateOf { state.layoutInfo.let { it.visibleItemsInfo.lastOrNull()?.index ?: 0 } >= vm.items.size - 3 } }
     LaunchedEffect(nearEnd, vm.items.size) { if (nearEnd && vm.items.isNotEmpty()) vm.loadMore() }
 

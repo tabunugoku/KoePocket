@@ -120,10 +120,13 @@ private fun AppRoot(app: KoeKoeApp) {
                 if (showTabs) {
                     NavigationBar(containerColor = Navy, contentColor = Color.White) {
                         NavTab.entries.forEach { t ->
+                            val isCurrent = dest?.hierarchy?.any { it.route == t.route } == true
                             NavigationBarItem(
-                                selected = dest?.hierarchy?.any { it.route == t.route } == true,
+                                selected = isCurrent,
                                 onClick = {
-                                    nav.navigate(t.route) {
+                                    // 選択中のタブをもう一度押したら、一覧を先頭へ戻す
+                                    if (isCurrent) TabReselect.events.tryEmit(t.route)
+                                    else nav.navigate(t.route) {
                                         popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
@@ -237,7 +240,7 @@ private fun HomeScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, onSettings: () ->
                 onDismiss = { showTagPicker = false },
             )
         }
-        VoiceListScreen(app, category.path(genre, tag), onOpen, Modifier.weight(1f))
+        VoiceListScreen(app, category.path(genre, tag), onOpen, Modifier.weight(1f), reselectRoute = "home")
     }
 }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -80,6 +81,7 @@ fun FavoritesScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier =
         deleteLabel = stringResource(R.string.fav_remove),
         history = app.history,
         historyScope = "fav",
+        route = "favorites",
         onOpen = onOpen,
         onMove = { ids, folder -> scope.launch { app.library.moveFavorites(ids, folder) } },
         onDelete = { ids -> scope.launch { ids.forEach { dao.removeFavorite(it) } } },
@@ -103,6 +105,7 @@ fun DownloadsScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier =
         deleteLabel = stringResource(R.string.dl_delete),
         history = app.history,
         historyScope = "dl",
+        route = "downloads",
         onOpen = onOpen,
         onMove = { ids, folder -> scope.launch { app.library.moveDownloads(ids, folder) } },
         onDelete = { ids ->
@@ -128,6 +131,7 @@ private fun LibraryScreen(
     deleteLabel: String,
     history: SearchHistory,
     historyScope: String,
+    route: String,
     onOpen: (Long) -> Unit,
     onMove: (Set<Long>, Long?) -> Unit,
     onDelete: (Set<Long>) -> Unit,
@@ -150,6 +154,8 @@ private fun LibraryScreen(
     var manageDialog by remember { mutableStateOf(false) }
     var newFolderDialog by remember { mutableStateOf<((Long) -> Unit)?>(null) }
     val selecting = selected.isNotEmpty()
+    val listState = rememberLazyListState()
+    ScrollToTopOnReselect(route, listState)
     val allLabel = stringResource(R.string.all)
     val noneLabel = stringResource(R.string.uncategorized)
 
@@ -264,7 +270,7 @@ private fun LibraryScreen(
                 Text(if (items.isEmpty()) emptyText else stringResource(R.string.no_match))
             }
         } else {
-            LazyColumn(Modifier.weight(1f)) {
+            LazyColumn(Modifier.weight(1f), state = listState) {
                 items(shown, key = { it.id }) { item ->
                     val isSel = item.id in selected
                     val folderName = item.folderId?.let { folderNames[it] }
