@@ -92,7 +92,8 @@ h2{font-size:2rem;text-align:center;margin:0 0 40px}
 .shots figure:hover img{transform:translateY(-8px)}
 .shots figcaption{margin-top:12px;font-size:.9rem;color:var(--mut)}
 .shots-note{text-align:center;color:var(--mut);font-size:.8rem;margin:0}
-@media (min-width:1000px){.shots{justify-content:center}}
+.shots figure:first-child{margin-left:auto}
+.shots figure:last-child{margin-right:auto}
 .priv{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
 .priv span{padding:10px 18px;border-radius:999px;background:var(--card);border:1px solid var(--line)}
 .priv span::before{content:"✓ ";color:var(--accent);font-weight:700}
