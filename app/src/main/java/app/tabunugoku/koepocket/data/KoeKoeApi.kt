@@ -15,7 +15,12 @@ import java.net.URLEncoder
 class NotFoundException : Exception("not found")
 
 /** サイトへの負荷を抑えるため、HTMLリクエストの間隔に下限を設けている。 */
-class KoeKoeApi(cacheDir: File) {
+class KoeKoeApi(
+    cacheDir: File,
+    // テストで差し替えられるようにしている
+    private val baseUrl: String = KoeKoeParser.BASE,
+    private val minIntervalMs: Long = MIN_INTERVAL_MS,
+) {
     val client: OkHttpClient = OkHttpClient.Builder()
         .cache(Cache(File(cacheDir, "http"), 20L * 1024 * 1024))
         .addInterceptor { chain ->
@@ -28,7 +33,7 @@ class KoeKoeApi(cacheDir: File) {
 
     private suspend fun getHtml(url: String): String = withContext(Dispatchers.IO) {
         gate.withLock {
-            val wait = MIN_INTERVAL_MS - (System.currentTimeMillis() - last)
+            val wait = minIntervalMs - (System.currentTimeMillis() - last)
             if (wait > 0) delay(wait)
             try {
                 client.newCall(Request.Builder().url(url).build()).execute().use { res ->
@@ -44,7 +49,7 @@ class KoeKoeApi(cacheDir: File) {
     }
 
     suspend fun list(path: String, page: Int): VoiceListPage {
-        val url = KoeKoeParser.BASE + path + if (page > 1) (if ('?' in path) "&p=$page" else "?p=$page") else ""
+        val url = baseUrl + path + if (page > 1) (if ('?' in path) "&p=$page" else "?p=$page") else ""
         return KoeKoeParser.parseList(getHtml(url))
     }
 
@@ -56,11 +61,11 @@ class KoeKoeApi(cacheDir: File) {
      */
     suspend fun tagsPage(page: Int): List<String> =
         tagPages[page] ?: KoeKoeParser.parseTags(
-            getHtml("${KoeKoeParser.BASE}all_tag.php" + if (page > 1) "?p=$page" else ""),
+            getHtml("${baseUrl}all_tag.php" + if (page > 1) "?p=$page" else ""),
         ).also { if (it.isNotEmpty()) tagPages[page] = it }
 
     suspend fun detail(id: Long): VoiceDetail? =
-        KoeKoeParser.parseDetail(getHtml("${KoeKoeParser.BASE}detail.php?n=$id"), id)
+        KoeKoeParser.parseDetail(getHtml("${baseUrl}detail.php?n=$id"), id)
 
     companion object {
         private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14) KoeKoeViewer/0.1"
