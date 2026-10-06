@@ -35,7 +35,7 @@ class KoeKoeApi(cacheDir: File) {
                     // 投稿が削除されたページは 404 (または 410) になる
                     if (res.code == 404 || res.code == 410) throw NotFoundException()
                     if (!res.isSuccessful) error("HTTP ${res.code}")
-                    res.body!!.string()
+                    (res.body ?: error("empty body")).string()
                 }
             } finally {
                 last = System.currentTimeMillis()

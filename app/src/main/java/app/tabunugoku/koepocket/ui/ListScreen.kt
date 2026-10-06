@@ -123,10 +123,11 @@ fun VoiceListScreen(
         }
         item {
             Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                val err = vm.error
                 when {
                     vm.loading -> CircularProgressIndicator()
-                    vm.error != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(vm.error!!)
+                    err != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(err)
                         TextButton(onClick = vm::retry) { Text(stringResource(R.string.reload)) }
                     }
                 }

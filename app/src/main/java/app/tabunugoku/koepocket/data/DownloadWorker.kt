@@ -38,7 +38,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             withContext(Dispatchers.IO) {
                 app.api.client.newCall(Request.Builder().url(detail.audioUrl).build()).execute().use { res ->
                     if (!res.isSuccessful) error("HTTP ${res.code}")
-                    val body = res.body!!
+                    val body = res.body ?: error("empty body")
                     val total = body.contentLength()
                     var done = 0L
                     var lastPct = -1

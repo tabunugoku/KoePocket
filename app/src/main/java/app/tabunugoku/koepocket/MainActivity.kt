@@ -99,11 +99,12 @@ private fun AppRoot(app: KoeKoeApp) {
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // 各画面のバーが自分でステータスバー分を確保する
         bottomBar = {
             Column {
-                if (player.currentId != null && dest?.route?.startsWith("detail/") != true) {
+                val currentId = player.currentId
+                if (currentId != null && dest?.route?.startsWith("detail/") != true) {
                     Surface(
                         color = Navy,
                         contentColor = Color.White,
-                        modifier = Modifier.fillMaxWidth().clickable { openDetail(player.currentId!!) },
+                        modifier = Modifier.fillMaxWidth().clickable { openDetail(currentId) },
                     ) {
                         Column(Modifier.then(if (showTabs) Modifier else Modifier.navigationBarsPadding())) {
                             Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -112,7 +113,7 @@ private fun AppRoot(app: KoeKoeApp) {
                                     Icon(if (player.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, stringResource(R.string.play_pause), tint = Accent)
                                 }
                             }
-                            MiniSeekBar(app, player.currentId, player.isPlaying)
+                            MiniSeekBar(app, currentId, player.isPlaying)
                         }
                     }
                 }
@@ -159,14 +160,23 @@ private fun AppRoot(app: KoeKoeApp) {
             composable(NavTab.FAVORITES.route) { FavoritesScreen(app, openDetail) }
             composable(NavTab.DOWNLOADS.route) { DownloadsScreen(app, openDetail) }
             composable("detail/{id}") { e ->
+                val id = e.arguments?.getString("id")?.toLongOrNull()
+                if (id == null) {
+                    LaunchedEffect(Unit) { nav.popBackStack() }
+                    return@composable
+                }
                 DetailScreen(
-                    app, e.arguments!!.getString("id")!!.toLong(),
+                    app, id,
                     onBack = { nav.popBackStack() }, onTag = openTag, onList = openList,
                 )
             }
             composable("list/{title}/{path}") { e ->
-                val title = unb64(e.arguments!!.getString("title")!!)
-                val path = unb64(e.arguments!!.getString("path")!!)
+                val title = e.arguments?.getString("title")?.let(::unb64)
+                val path = e.arguments?.getString("path")?.let(::unb64)
+                if (title == null || path == null) {
+                    LaunchedEffect(Unit) { nav.popBackStack() }
+                    return@composable
+                }
                 Column(Modifier.navigationBarsPadding()) {
                     BrandTopBar(title, onBack = { nav.popBackStack() })
                     VoiceListScreen(app, path, openDetail, Modifier.weight(1f))

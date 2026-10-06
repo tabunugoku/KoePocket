@@ -55,7 +55,8 @@ object KoeKoeParser {
             // 投稿日時は直後の <p>@12/11/17 …</p> にある
             val posted = p.nextElementSibling()?.text()?.trim().orEmpty().takeIf { it.startsWith("@") }
                 ?.removePrefix("@")?.trim().orEmpty()
-            VoiceComment(m.groupValues[1].toInt(), p.selectFirst(".entry_auth")!!.text(), m.groupValues[3], posted)
+            val name = p.selectFirst(".entry_auth")?.text() ?: return@mapNotNull null
+            VoiceComment(m.groupValues[1].toInt(), name, m.groupValues[3], posted)
         }
         val desc = doc.selectFirst("div.desc.detail")
         val authorLink = desc?.selectFirst("a[href*=m=1]")
