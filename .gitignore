@@ -7,3 +7,4 @@ keystore.properties
 *.jks
 *.apk
 dist/
+.kotlin/
