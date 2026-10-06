@@ -6,6 +6,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
+import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -31,12 +32,12 @@ class KoeKoeApi(
     private val gate = Mutex()
     private var last = 0L
 
-    private suspend fun getHtml(url: String): String = withContext(Dispatchers.IO) {
+    private suspend fun getHtml(url: String, fresh: Boolean = false): String = withContext(Dispatchers.IO) {
         gate.withLock {
             val wait = minIntervalMs - (System.currentTimeMillis() - last)
             if (wait > 0) delay(wait)
             try {
-                client.newCall(Request.Builder().url(url).build()).execute().use { res ->
+                client.newCall(Request.Builder().url(url).apply { if (fresh) cacheControl(CacheControl.FORCE_NETWORK) }.build()).execute().use { res ->
                     // 投稿が削除されたページは 404 (または 410) になる
                     if (res.code == 404 || res.code == 410) throw NotFoundException()
                     if (!res.isSuccessful) error("HTTP ${res.code}")
@@ -48,9 +49,10 @@ class KoeKoeApi(
         }
     }
 
-    suspend fun list(path: String, page: Int): VoiceListPage {
+    /** [fresh] が true のときは、HTTPキャッシュを使わず必ずサイトから取得する (更新操作用)。 */
+    suspend fun list(path: String, page: Int, fresh: Boolean = false): VoiceListPage {
         val url = baseUrl + path + if (page > 1) (if ('?' in path) "&p=$page" else "?p=$page") else ""
-        return KoeKoeParser.parseList(getHtml(url))
+        return KoeKoeParser.parseList(getHtml(url, fresh))
     }
 
     private val tagPages = HashMap<Int, List<String>>()

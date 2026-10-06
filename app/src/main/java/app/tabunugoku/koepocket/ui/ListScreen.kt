@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,34 +48,50 @@ class ListViewModel(
 ) : ViewModel() {
     var items by mutableStateOf<List<VoiceItem>>(emptyList()); private set
     var loading by mutableStateOf(false); private set
+    var refreshing by mutableStateOf(false); private set
+    /** 更新が成功するたびに増える。画面側が先頭へ戻すきっかけにする。 */
+    var refreshCount by mutableIntStateOf(0); private set
     var error by mutableStateOf<String?>(null); private set
     private var page = 0
     private var hasNext = true
 
-    init { loadMore() }
+    init { load(reset = false) }
 
-    fun loadMore() {
-        if (loading || !hasNext) return
+    fun loadMore() = load(reset = false)
+
+    /** 1ページ目から取り直す。取得に失敗したときは、表示中の一覧をそのまま残す。 */
+    fun refresh() = load(reset = true)
+
+    private fun load(reset: Boolean) {
+        if (loading || (!reset && !hasNext)) return
         loading = true
+        refreshing = reset
         error = null
         viewModelScope.launch {
             try {
+                var acc = if (reset) emptyList() else items
+                var pageNo = if (reset) 0 else page
+                var more = if (reset) true else hasNext
                 var added = 0
                 var fetched = 0
-                while (hasNext && added < MIN_NEW && fetched < MAX_PAGES) {
-                    val res = app.api.list(path, page + 1)
-                    page++
+                while (more && added < MIN_NEW && fetched < MAX_PAGES) {
+                    val res = app.api.list(path, pageNo + 1, fresh = reset && fetched == 0)
+                    pageNo++
                     fetched++
-                    hasNext = res.hasNext && res.items.isNotEmpty()
-                    val visible = filterByGender(res.items, genders)
-                    val before = items.size
-                    items = (items + visible).distinctBy { it.id }
-                    added += items.size - before
+                    more = res.hasNext && res.items.isNotEmpty()
+                    val before = acc.size
+                    acc = (acc + filterByGender(res.items, genders)).distinctBy { it.id }
+                    added += acc.size - before
+                    items = acc
+                    page = pageNo
+                    hasNext = more
+                    if (reset && fetched == 1) refreshCount++
                 }
             } catch (e: Exception) {
                 error = errorMessage(app, e)
             } finally {
                 loading = false
+                refreshing = false
             }
         }
     }
@@ -96,6 +113,7 @@ fun errorMessage(ctx: Context, e: Exception): String = when (e) {
 fun filterByGender(items: List<VoiceItem>, genders: Set<String>): List<VoiceItem> =
     if (genders.isEmpty()) items else items.filter { it.gender in genders }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoiceListScreen(
     app: KoeKoeApp,
@@ -108,27 +126,31 @@ fun VoiceListScreen(
     val vm: ListViewModel = viewModel(key = key, factory = viewModelFactory { initializer { ListViewModel(app, path, genders) } })
     val ctx = LocalContext.current
     val state = rememberLazyListState()
-    val nearEnd by remember { derivedStateOf { state.layoutInfo.let { it.visibleItemsInfo.lastOrNull()?.index ?: 0 } >= vm.items.size - 3 } }
+    val nearEnd by remember(vm, state) { derivedStateOf { state.layoutInfo.let { it.visibleItemsInfo.lastOrNull()?.index ?: 0 } >= vm.items.size - 3 } }
     LaunchedEffect(nearEnd, vm.items.size) { if (nearEnd && vm.items.isNotEmpty()) vm.loadMore() }
 
-    LazyColumn(state = state, modifier = modifier.fillMaxSize()) {
-        items(vm.items, key = { it.id }) { v ->
-            VoiceRow(
-                title = v.title,
-                subtitle = "${v.author}・${SiteText.duration(ctx, v.duration)}・♥${v.likes}・${stringResource(R.string.comments_short, v.comments)}・${SiteText.ago(ctx, v.postedAgo)}",
-                onClick = { onOpen(v.id) },
-                gender = v.gender,
-            )
-            HorizontalDivider()
-        }
-        item {
-            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                val err = vm.error
-                when {
-                    vm.loading -> CircularProgressIndicator()
-                    err != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(err)
-                        TextButton(onClick = vm::retry) { Text(stringResource(R.string.reload)) }
+    LaunchedEffect(vm.refreshCount) { if (vm.refreshCount > 0) state.scrollToItem(0) }
+
+    PullToRefreshBox(isRefreshing = vm.refreshing, onRefresh = vm::refresh, modifier = modifier.fillMaxSize()) {
+        LazyColumn(state = state, modifier = Modifier.fillMaxSize()) {
+            items(vm.items, key = { it.id }) { v ->
+                VoiceRow(
+                    title = v.title,
+                    subtitle = "${v.author}・${SiteText.duration(ctx, v.duration)}・♥${v.likes}・${stringResource(R.string.comments_short, v.comments)}・${SiteText.ago(ctx, v.postedAgo)}",
+                    onClick = { onOpen(v.id) },
+                    gender = v.gender,
+                )
+                HorizontalDivider()
+            }
+            item {
+                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    val err = vm.error
+                    when {
+                        vm.loading && !vm.refreshing -> CircularProgressIndicator()
+                        err != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(err)
+                            TextButton(onClick = vm::retry) { Text(stringResource(R.string.reload)) }
+                        }
                     }
                 }
             }
