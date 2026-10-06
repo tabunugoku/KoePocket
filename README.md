@@ -8,11 +8,13 @@
 紹介ページ: https://tabunugoku.github.io/KoePocket/
 
 <p>
-  <img src="docs/img/home.png" width="19%" alt="ホーム">
-  <img src="docs/img/detail.png" width="19%" alt="投稿の詳細と再生">
-  <img src="docs/img/favorites.png" width="19%" alt="お気に入り">
-  <img src="docs/img/downloads.png" width="19%" alt="保存済み">
-  <img src="docs/img/settings.png" width="19%" alt="設定">
+  <img src="docs/img/agreement.png" width="13%" alt="初回の確認">
+  <img src="docs/img/home.png" width="13%" alt="ホーム">
+  <img src="docs/img/detail.png" width="13%" alt="投稿の詳細と再生">
+  <img src="docs/img/search.png" width="13%" alt="検索">
+  <img src="docs/img/favorites.png" width="13%" alt="お気に入り">
+  <img src="docs/img/downloads.png" width="13%" alt="保存済み">
+  <img src="docs/img/settings.png" width="13%" alt="設定">
 </p>
 
 画像に写る投稿は、動作確認用に作ったダミーです。実在の投稿ではありません。
