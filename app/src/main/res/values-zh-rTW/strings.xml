@@ -42,6 +42,8 @@
     <string name="network_error">無法連線，請檢查網路</string>
     <string name="post_removed">該投稿似乎已從 Koe-Koe 刪除</string>
     <string name="voice_not_found">找不到音訊</string>
+    <string name="download_failed">下載失敗</string>
+    <string name="playback_error">無法播放此音訊</string>
     <string name="comments_short">留言%1$d</string>
     <string name="voice_title">音訊</string>
     <string name="downloaded_tap_delete">已下載（點擊刪除）</string>

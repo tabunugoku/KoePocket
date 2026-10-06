@@ -42,6 +42,8 @@
     <string name="network_error">无法连接，请检查网络</string>
     <string name="post_removed">该投稿似乎已从 Koe-Koe 删除</string>
     <string name="voice_not_found">找不到音频</string>
+    <string name="download_failed">下载失败</string>
+    <string name="playback_error">无法播放此音频</string>
     <string name="comments_short">评论%1$d</string>
     <string name="voice_title">音频</string>
     <string name="downloaded_tap_delete">已下载（点击删除）</string>

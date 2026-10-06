@@ -42,6 +42,8 @@
     <string name="network_error">연결할 수 없습니다. 네트워크를 확인하세요</string>
     <string name="post_removed">이 게시물은 Koe-Koe에서 삭제된 것 같습니다</string>
     <string name="voice_not_found">음성을 찾을 수 없습니다</string>
+    <string name="download_failed">다운로드에 실패했습니다</string>
+    <string name="playback_error">재생할 수 없습니다</string>
     <string name="comments_short">댓글 %1$d</string>
     <string name="voice_title">음성</string>
     <string name="downloaded_tap_delete">다운로드됨 (탭하여 삭제)</string>

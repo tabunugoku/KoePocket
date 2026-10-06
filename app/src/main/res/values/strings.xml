@@ -43,6 +43,8 @@
     <string name="network_error">通信できません。ネットワークを確認してください</string>
     <string name="post_removed">この投稿はKoe-Koeから削除されたようです</string>
     <string name="voice_not_found">音声が見つかりません</string>
+    <string name="download_failed">ダウンロードに失敗しました</string>
+    <string name="playback_error">再生できませんでした</string>
     <string name="comments_short">コメ%1$d</string>
     <string name="voice_title">音声</string>
     <string name="downloaded_tap_delete">ダウンロード済み(タップで削除)</string>

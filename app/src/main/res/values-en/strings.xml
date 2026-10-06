@@ -42,6 +42,8 @@
     <string name="network_error">Can\'t connect. Check your network.</string>
     <string name="post_removed">This post seems to have been removed from Koe-Koe</string>
     <string name="voice_not_found">Audio not found</string>
+    <string name="download_failed">Download failed</string>
+    <string name="playback_error">This audio can’t be played</string>
     <string name="comments_short">Cmts: %1$d</string>
     <string name="voice_title">Audio</string>
     <string name="downloaded_tap_delete">Downloaded (tap to delete)</string>
