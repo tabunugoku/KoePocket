@@ -5,6 +5,18 @@
 
 **18歳以上の方のみ利用できます。** 初回起動時に確認画面を出します。
 
+紹介ページ: https://tabunugoku.github.io/KoePocket/
+
+<p>
+  <img src="docs/img/home.png" width="19%" alt="ホーム">
+  <img src="docs/img/detail.png" width="19%" alt="投稿の詳細と再生">
+  <img src="docs/img/favorites.png" width="19%" alt="お気に入り">
+  <img src="docs/img/downloads.png" width="19%" alt="保存済み">
+  <img src="docs/img/settings.png" width="19%" alt="設定">
+</p>
+
+画像の投稿は、動作確認用に作ったダミーです。実在の投稿ではありません。
+
 ## インストール
 
 1. [Releases](../../releases) から `KoePocket-x.y.z.apk` をダウンロードします。
