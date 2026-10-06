@@ -3,8 +3,8 @@
 ## 脆弱性の報告
 
 脆弱性を見つけたら、公開の Issue ではなく、GitHub の
-[Private vulnerability reporting](../../security/advisories/new) から報告してください。
-内容を確認し、対応を決めたうえで返信します。個人で開発しているため、返信まで数日かかることがあります。
+[Private vulnerability reporting](https://github.com/tabunugoku/KoePocket/security/advisories/new) から報告してください。
+内容を確認し、対応を決めたうえで返信します。個人で開発しているため、返信までに時間がかかることがあります。
 
 ## 対象
 
