@@ -10,7 +10,9 @@ object KoeKoeParser {
     fun parseList(html: String): VoiceListPage {
         val doc = Jsoup.parse(html, BASE)
         val items = doc.select("div.content > a[href^=detail.php?n=]").mapNotNull(::parseItem)
-        val hasNext = doc.select("a.prev_next[href]").any { it.select(".pager_next_text").isNotEmpty() }
+        // v_list.php は a.prev_next、list.php は span.paging_next 内のリンクで「次へ」を表す
+        val hasNext = doc.select("a.prev_next[href]").any { it.select(".pager_next_text").isNotEmpty() } ||
+            doc.select(".paging_next a[href]").isNotEmpty()
         return VoiceListPage(items.distinctBy { it.id }, hasNext)
     }
 

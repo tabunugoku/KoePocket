@@ -21,6 +21,12 @@ class KoeKoeParserTest {
         assertEquals("1分前", first.postedAgo)
     }
 
+    @Test fun detectsNextPageOnListPhpPager() {
+        fun pager(next: String) = """<div id="page-navi"><span class="paging_prev"><span class="prev_next disabled"></span></span>$next</div>"""
+        assertTrue(KoeKoeParser.parseList(pager("""<span class="paging_next"><a href="list.php?g=3&g2=0&p=2"><i></i></a></span>""")).hasNext)
+        assertFalse(KoeKoeParser.parseList(pager("""<span class="paging_next"><span class="prev_next disabled"></span></span>""")).hasNext)
+    }
+
     @Test fun parsesDetail() {
         val d = KoeKoeParser.parseDetail(res("detail.html"), 1)!!
         assertEquals("https://file.koe-koe.com/sound/old/1.mp3", d.audioUrl)
