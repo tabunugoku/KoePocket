@@ -29,6 +29,9 @@ class KoeKoeApi(
         }
         .build()
 
+    /** 音声の取得 (ダウンロード・再生) 用。音声を HTTP キャッシュに書き込まず、一覧や詳細のキャッシュを押し出さない。 */
+    val audioClient: OkHttpClient = client.newBuilder().cache(null).build()
+
     private val gate = Mutex()
     private var last = 0L
 

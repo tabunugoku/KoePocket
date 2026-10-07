@@ -11,7 +11,10 @@ import androidx.work.*
 import app.tabunugoku.koepocket.KoeKoeApp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 import okhttp3.Request
 
 class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
@@ -36,28 +39,36 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         }
         try {
             withContext(Dispatchers.IO) {
-                app.api.client.newCall(Request.Builder().url(detail.audioUrl).build()).execute().use { res ->
-                    if (!res.isSuccessful) error("HTTP ${res.code}")
-                    val body = res.body ?: error("empty body")
-                    val total = body.contentLength()
-                    var done = 0L
-                    var lastPct = -1
-                    val buf = ByteArray(32 * 1024)
-                    body.byteStream().use { input ->
-                        target.out.use { out ->
-                            while (true) {
-                                val n = input.read(buf)
-                                if (n < 0) break
-                                out.write(buf, 0, n)
-                                done += n
-                                val pct = if (total > 0) (done * 100 / total).toInt() else -1
-                                if (pct != lastPct) {
-                                    lastPct = pct
-                                    setProgress(workDataOf(KEY_PCT to pct))
+                val call = app.api.audioClient.newCall(Request.Builder().url(detail.audioUrl).build())
+                // 停止・キャンセルされたら、読み込み待ちの通信も止める
+                val onStop = coroutineContext.job.invokeOnCompletion { if (it != null) call.cancel() }
+                try {
+                    call.execute().use { res ->
+                        if (!res.isSuccessful) error("HTTP ${res.code}")
+                        val body = res.body ?: error("empty body")
+                        val total = body.contentLength()
+                        var done = 0L
+                        var lastPct = -1
+                        val buf = ByteArray(32 * 1024)
+                        body.byteStream().use { input ->
+                            target.out.use { out ->
+                                while (true) {
+                                    ensureActive()
+                                    val n = input.read(buf)
+                                    if (n < 0) break
+                                    out.write(buf, 0, n)
+                                    done += n
+                                    val pct = if (total > 0) (done * 100 / total).toInt() else -1
+                                    if (pct != lastPct) {
+                                        lastPct = pct
+                                        setProgress(workDataOf(KEY_PCT to pct))
+                                    }
                                 }
                             }
                         }
                     }
+                } finally {
+                    onStop.dispose()
                 }
             }
         } catch (e: Exception) {
@@ -102,7 +113,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             .setProgress(0, 0, true)
             .build()
         if (disguised && s.disguiseAppName.isNotBlank()) n.extras.putString("android.substName", s.disguiseAppName)
-        val nid = NOTIFICATION_ID + (id % 1000).toInt()
+        // 同時に動く別の投稿のダウンロードと通知 ID が重ならないよう、投稿 ID から決める
+        val nid = (NOTIFICATION_ID + id).toInt()
         return if (Build.VERSION.SDK_INT >= 29) {
             ForegroundInfo(nid, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {

@@ -37,6 +37,7 @@ import app.tabunugoku.koepocket.data.Genre
 import app.tabunugoku.koepocket.data.NotFoundException
 import app.tabunugoku.koepocket.data.VoiceComment
 import app.tabunugoku.koepocket.data.VoiceDetail
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -69,11 +70,10 @@ fun DetailScreen(
     LaunchedEffect(id, reload) {
         error = null
         removedOnSite = false
-        try {
-            detail = app.api.detail(id)
-            offline = false
-            detail?.let { app.library.refresh(it) }
-            if (detail == null) error = ctx.getString(R.string.voice_not_found)
+        val fetched = try {
+            app.api.detail(id)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             val gone = e is NotFoundException
             if (gone) {
@@ -88,6 +88,20 @@ fun DetailScreen(
                 offline = true
             } else {
                 error = errorMessage(ctx, e)
+            }
+            return@LaunchedEffect
+        }
+        detail = fetched
+        offline = false
+        if (fetched == null) {
+            error = ctx.getString(R.string.voice_not_found)
+        } else {
+            // 保存済みの項目の更新に失敗しても、取得できた詳細の表示は妨げない
+            try {
+                app.library.refresh(fetched)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
             }
         }
     }

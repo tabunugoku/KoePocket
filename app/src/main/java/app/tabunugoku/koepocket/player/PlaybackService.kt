@@ -19,7 +19,7 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         val app = application as KoeKoeApp
-        val http = OkHttpDataSource.Factory(app.api.client)
+        val http = OkHttpDataSource.Factory(app.api.audioClient)
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(this, http)))
             .setAudioAttributes(AudioAttributes.DEFAULT, true)

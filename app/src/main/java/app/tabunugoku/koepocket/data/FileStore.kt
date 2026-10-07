@@ -30,7 +30,13 @@ object FileStore {
 
     private val hasMediaStore get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
-    private fun safeName(title: String) = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(60)
+    private fun safeName(title: String): String {
+        val s = title.replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "_")
+        // 絵文字などを途中で切らないよう、文字数はコードポイントで数える
+        return if (s.codePointCount(0, s.length) <= MAX_NAME_CHARS) s else s.substring(0, s.offsetByCodePoints(0, MAX_NAME_CHARS))
+    }
+
+    private const val MAX_NAME_CHARS = 60
 
     /** 書きかけのファイルにつける拡張子 (SAF・アプリ専用フォルダ)。完了時に .mp3 へ改名する。 */
     private const val PART_EXT = ".part"
