@@ -87,7 +87,9 @@ object FileStore {
         Target(
             out,
             commit = {
-                resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
+                // 更新できないと端末の音楽に出ず再生もできないので、失敗として扱う (呼び出し側で discard される)
+                val updated = resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
+                check(updated > 0) { "IS_PENDING update failed" }
                 uri.toString()
             },
             discard = { runCatching { resolver.delete(uri, null, null) } },
@@ -118,9 +120,10 @@ object FileStore {
 
     /**
      * 中断されて残った書きかけのファイルを消す。ダウンロードが動いていないときだけ呼ぶこと。
-     * 対象は、このアプリが付けた印 (MediaStore の IS_PENDING / 拡張子 .part) のあるファイルだけ。
+     * 対象は、このアプリが付けた印 (MediaStore の IS_PENDING / 「ID_」で始まる .part) のあるファイルだけ。
+     * [keep] は保存済みとして記録されているパス。改名に失敗して .part のまま残した再生可能なファイルを消さないために使う。
      */
-    fun cleanupOrphans(ctx: Context, settings: AppSettings) = runCatching {
+    fun cleanupOrphans(ctx: Context, settings: AppSettings, keep: Set<String> = emptySet()) = runCatching {
         if (hasMediaStore) {
             val resolver = ctx.contentResolver
             val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -135,11 +138,20 @@ object FileStore {
             }
             ids.forEach { resolver.delete(ContentUris.withAppendedId(collection, it), null, null) }
         }
-        ctx.getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.listFiles { f -> f.name.endsWith(PART_EXT) }?.forEach { it.delete() }
+        ctx.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+            ?.listFiles { f -> isOwnPart(f.name) && f.absolutePath !in keep }
+            ?.forEach { it.delete() }
         settings.downloadTreeUri?.let { tree ->
-            DocumentFile.fromTreeUri(ctx, Uri.parse(tree))?.listFiles()?.filter { it.name?.endsWith(PART_EXT) == true }?.forEach { it.delete() }
+            DocumentFile.fromTreeUri(ctx, Uri.parse(tree))?.listFiles()
+                ?.filter { isOwnPart(it.name) && it.uri.toString() !in keep }
+                ?.forEach { it.delete() }
         }
     }
+
+    /** このアプリが書きかけに付けた名前 (「ID_題名….part」) か。保存先が共有フォルダでも、他アプリの .part を巻き込まない。 */
+    private fun isOwnPart(name: String?) = name != null && PART_NAME.matches(name)
+
+    private val PART_NAME = Regex("^\\d+_.*" + Regex.escape(PART_EXT) + "$")
 
     fun isContent(path: String) = path.startsWith("content:")
 

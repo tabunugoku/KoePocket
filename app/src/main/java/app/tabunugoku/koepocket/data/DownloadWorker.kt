@@ -66,8 +66,20 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             if (e is CancellationException) throw e
             return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
-        val path = target.commit()
-        app.library.addDownload(detail, path)
+        // 保存の確定や記録で失敗したら、書き終えたファイルを残さず、通常の失敗と同じく再試行する
+        val path = try {
+            target.commit()
+        } catch (e: Exception) {
+            target.discard()
+            return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
+        }
+        try {
+            app.library.addDownload(detail, path)
+        } catch (e: Exception) {
+            FileStore.delete(applicationContext, path)
+            if (e is CancellationException) throw e
+            return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
+        }
         return Result.success()
     }
 

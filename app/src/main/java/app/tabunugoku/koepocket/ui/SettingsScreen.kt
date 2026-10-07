@@ -44,10 +44,15 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
             // アプリを再起動しても読み書きできるよう、権限を永続化する
-            ctx.contentResolver.takePersistableUriPermission(
-                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
-            if (treeUri != uri.toString()) releaseTree(ctx, treeUri)
+            // 永続化できないフォルダ (提供元が対応していない) は選べないので、設定を変えずに戻る
+            val persisted = runCatching {
+                ctx.contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }.isSuccess
+            if (!persisted) return@rememberLauncherForActivityResult
+            val old = treeUri
+            if (old != uri.toString()) scope.launch { releaseTreeIfUnused(app, ctx, old) }
             settings.downloadTreeUri = uri.toString()
             treeUri = uri.toString()
         }
@@ -90,7 +95,12 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
                 )
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { picker.launch(null) }) { Text(stringResource(R.string.choose_folder)) }
-                    if (treeUri != null) OutlinedButton(onClick = { releaseTree(ctx, treeUri); settings.downloadTreeUri = null; treeUri = null }) {
+                    if (treeUri != null) OutlinedButton(onClick = {
+                        val old = treeUri
+                        scope.launch { releaseTreeIfUnused(app, ctx, old) }
+                        settings.downloadTreeUri = null
+                        treeUri = null
+                    }) {
                         Text(stringResource(R.string.reset_default))
                     }
                 }
@@ -200,9 +210,17 @@ private fun SettingSwitch(title: String, description: String, checked: Boolean, 
     }
 }
 
-/** 保存先に選んでいたフォルダの永続的な権限を手放す (保存先を変えたときに権限がたまらないように)。 */
-private fun releaseTree(ctx: Context, tree: String?) {
+/**
+ * 保存先に選んでいたフォルダの永続的な権限を手放す (保存先を変えたときに権限がたまらないように)。
+ * そのフォルダの中に保存済みの項目が残っているときは、再生・削除ができなくなるので手放さない。
+ */
+private suspend fun releaseTreeIfUnused(app: KoeKoeApp, ctx: Context, tree: String?) {
     if (tree == null) return
+    val inUse = withContext(Dispatchers.IO) {
+        // 保存済みの項目の URI は「<フォルダの URI>/document/…」の形になる
+        runCatching { app.db.dao().allDownloads().any { it.path.startsWith("$tree/document/") } }.getOrDefault(true)
+    }
+    if (inUse) return
     runCatching {
         ctx.contentResolver.releasePersistableUriPermission(
             Uri.parse(tree), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
