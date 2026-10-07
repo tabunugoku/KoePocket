@@ -344,10 +344,13 @@ private fun MiniSeekBar(app: KoeKoeApp, currentId: Long?, isPlaying: Boolean) {
     var dur by remember { mutableLongStateOf(0) }
     var dragging by remember { mutableStateOf(false) }
     LaunchedEffect(currentId, isPlaying) {
-        while (true) {
+        // 再生中だけ 500ms ごとに読む。一時停止中は、長さがまだ分からないときだけ少し待って読み直す
+        var waits = 0
+        do {
             if (!dragging) { pos = app.player.positionMs(); dur = app.player.durationMs() }
-            delay(500)
-        }
+            val again = isPlaying || (dur == 0L && waits++ < 20)
+            if (again) delay(500)
+        } while (again)
     }
     Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Slider(

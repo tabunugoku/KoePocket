@@ -74,7 +74,10 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
         try {
+            // 保存先を変えて取り直したときに、前の場所のファイルが誰にも参照されないまま残らないようにする
+            val oldPath = app.db.dao().downloaded(id)?.path
             app.library.addDownload(detail, path)
+            if (oldPath != null && oldPath != path) FileStore.delete(applicationContext, oldPath)
         } catch (e: Exception) {
             FileStore.delete(applicationContext, path)
             if (e is CancellationException) throw e

@@ -23,12 +23,31 @@ class PlayerConnection(private val ctx: Context) {
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state
 
-    init {
+    private var connecting = false
+    /** 接続が切れていたときに、つなぎ直したあとで実行する操作。 */
+    private var pending: (() -> Unit)? = null
+
+    init { connect() }
+
+    /** 再生サービスにつなぐ。失敗やサービスの終了で切れても、次の再生操作でつなぎ直す。 */
+    private fun connect() {
+        if (connecting) return
+        connecting = true
         val token = SessionToken(ctx, ComponentName(ctx, PlaybackService::class.java))
-        val future = MediaController.Builder(ctx, token).buildAsync()
+        val future = MediaController.Builder(ctx, token)
+            .setListener(object : MediaController.Listener {
+                override fun onDisconnected(controller: MediaController) {
+                    if (this@PlayerConnection.controller === controller) this@PlayerConnection.controller = null
+                    _state.value = PlayerState()
+                    controller.release()
+                }
+            })
+            .buildAsync()
         future.addListener({
-            // 接続に失敗してもアプリは落とさない (再生操作が無効になるだけ)
-            val c = runCatching { future.get() }.getOrNull() ?: return@addListener
+            connecting = false
+            // 接続に失敗してもアプリは落とさない (次の再生操作でもう一度つなぐ)
+            val c = runCatching { future.get() }.getOrNull()
+            if (c == null) { pending = null; return@addListener }
             controller = c
             c.addListener(object : Player.Listener {
                 override fun onEvents(player: Player, events: Player.Events) = sync(player)
@@ -37,6 +56,7 @@ class PlayerConnection(private val ctx: Context) {
                 }
             })
             sync(c)
+            pending?.also { pending = null }?.invoke()
         }, ContextCompat.getMainExecutor(ctx))
     }
 
@@ -51,7 +71,11 @@ class PlayerConnection(private val ctx: Context) {
 
     /** 同じ音声なら再生/一時停止を切り替え、違う音声なら読み込んで再生する。 */
     fun toggle(id: Long, title: String, uri: String) {
-        val c = controller ?: return
+        val c = controller ?: run {
+            pending = { toggle(id, title, uri) }
+            connect()
+            return
+        }
         if (c.currentMediaItem?.mediaId == id.toString()) {
             // エラーで止まっているときは、読み込み直してから再生する
             if (c.playerError != null) c.prepare()

@@ -29,13 +29,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import app.tabunugoku.koepocket.KoeKoeApp
 import app.tabunugoku.koepocket.data.VoiceItem
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -47,7 +46,8 @@ class ListViewModel(
     private val app: KoeKoeApp,
     private val path: String,
     private val genders: Set<String> = emptySet(),
-) : ViewModel() {
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     var items by mutableStateOf<List<VoiceItem>>(emptyList()); private set
     var loading by mutableStateOf(false); private set
     var refreshing by mutableStateOf(false); private set
@@ -69,7 +69,7 @@ class ListViewModel(
         loading = true
         refreshing = reset
         error = null
-        viewModelScope.launch {
+        scope.launch {
             try {
                 var acc = if (reset) emptyList() else items
                 var pageNo = if (reset) 0 else page
@@ -99,6 +99,26 @@ class ListViewModel(
     }
 
     fun retry() = loadMore()
+
+    /** 一覧を手放すとき。読み込み中の通信を止める。 */
+    fun close() = scope.cancel()
+}
+
+/**
+ * 開いた一覧 (パス・性別ごと) を、直近 [MAX_LISTS] 件だけ覚えておく。
+ * ジャンルやタグを切り替えるたびに読み込み済みの一覧がたまり続けないよう、古いものから手放す。主スレッドからだけ使う。
+ */
+object ListCache {
+    private const val MAX_LISTS = 8
+    private val lists = object : LinkedHashMap<String, ListViewModel>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ListViewModel>): Boolean {
+            val drop = size > MAX_LISTS
+            if (drop) eldest.value.close()
+            return drop
+        }
+    }
+
+    fun get(key: String, create: () -> ListViewModel): ListViewModel = lists.getOrPut(key, create)
 }
 
 private const val MIN_NEW = 8
@@ -140,7 +160,7 @@ fun VoiceListScreen(
     reselectRoute: String? = null,
 ) {
     val key = path + "|" + genders.sorted().joinToString(",")
-    val vm: ListViewModel = viewModel(key = key, factory = viewModelFactory { initializer { ListViewModel(app, path, genders) } })
+    val vm = remember(key) { ListCache.get(key) { ListViewModel(app, path, genders) } }
     val ctx = LocalContext.current
     val state = rememberLazyListState()
     ScrollToTopOnReselect(reselectRoute, state)

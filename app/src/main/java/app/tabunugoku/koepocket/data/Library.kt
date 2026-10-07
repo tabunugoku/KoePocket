@@ -9,14 +9,17 @@ class Library(private val db: AppDb, private val settings: AppSettings) {
      * [partial] は保存済みの控えから作った不完全な詳細 (オフライン表示)。コメント数が分からないので記録しない。
      */
     suspend fun addFavorite(d: VoiceDetail, partial: Boolean = false) {
+        val existing = dao.favorite(d.id)
         val folder = (if (settings.syncFolders) dao.downloaded(d.id)?.folderId else null)
-            ?: dao.favorite(d.id)?.folderId
+            ?: existing?.folderId
         dao.putFavorite(
             Favorite(
                 d.id, d.title, d.duration, System.currentTimeMillis(), folder,
                 gender = d.gender.ifEmpty { null },
                 author = d.author.ifEmpty { null },
-                commentCount = if (partial) null else d.comments.size,
+                // 控えからの不完全な詳細では、コメント数と「削除済み」の印は、すでに記録してある値を引き継ぐ
+                commentCount = if (partial) existing?.commentCount else d.comments.size,
+                removed = if (partial) existing?.removed ?: false else false,
             ),
         )
     }

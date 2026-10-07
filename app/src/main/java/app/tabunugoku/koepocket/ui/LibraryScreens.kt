@@ -180,8 +180,8 @@ private fun LibraryScreen(
             LibSort.TITLE -> filtered.sortedBy { it.title }
         }
     }
-    // 他の操作で消えた項目が選択に残らないようにする
-    LaunchedEffect(items) { selected = selected.intersect(items.map { it.id }.toSet()) }
+    // 他の操作で消えた項目や、絞り込みで見えなくなった項目が選択に残らないようにする (削除・移動は見えている項目だけに効く)
+    LaunchedEffect(shown) { selected = selected.intersect(shown.map { it.id }.toSet()) }
 
     Column(modifier.fillMaxSize()) {
         TopAppBar(
