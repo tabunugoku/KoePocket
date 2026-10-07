@@ -105,10 +105,19 @@ interface AppDao {
     @Query("UPDATE Downloaded SET gender = :gender WHERE id = :id AND gender IS NULL")
     suspend fun fillDownloadGender(id: Long, gender: String)
 
-    @Query("UPDATE Favorite SET author = :author, duration = :duration, commentCount = :comments, removed = 0 WHERE id = :id")
+    // 取得できなかった項目 (空文字) で、記録済みの値を消さない
+    @Query(
+        "UPDATE Favorite SET author = CASE WHEN :author = '' THEN author ELSE :author END, " +
+            "duration = CASE WHEN :duration = '' THEN duration ELSE :duration END, " +
+            "commentCount = :comments, removed = 0 WHERE id = :id",
+    )
     suspend fun refreshFavorite(id: Long, author: String, duration: String, comments: Int)
 
-    @Query("UPDATE Downloaded SET author = :author, duration = :duration, commentCount = :comments, removed = 0 WHERE id = :id")
+    @Query(
+        "UPDATE Downloaded SET author = CASE WHEN :author = '' THEN author ELSE :author END, " +
+            "duration = CASE WHEN :duration = '' THEN duration ELSE :duration END, " +
+            "commentCount = :comments, removed = 0 WHERE id = :id",
+    )
     suspend fun refreshDownload(id: Long, author: String, duration: String, comments: Int)
 
     @Query("UPDATE Favorite SET removed = 1 WHERE id = :id")

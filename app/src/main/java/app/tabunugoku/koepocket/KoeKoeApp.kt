@@ -26,11 +26,13 @@ class KoeKoeApp : Application() {
                 settings.defaultDirPrepared = true
             }
             // ダウンロードが動いていないときだけ、中断で残った書きかけのファイルを消す
+            // この時刻より後に始まったダウンロードの書きかけは、掃除の対象にしない
+            val startedAt = System.currentTimeMillis()
             val busy = WorkManager.getInstance(this@KoeKoeApp).getWorkInfosByTag(DownloadWorker.TAG).get().any { !it.state.isFinished }
             if (!busy) {
                 // 記録を読めないときは、何も消さない
                 runCatching { db.dao().allDownloads().map { it.path }.toSet() }.getOrNull()
-                    ?.let { FileStore.cleanupOrphans(this@KoeKoeApp, settings, it) }
+                    ?.let { FileStore.cleanupOrphans(this@KoeKoeApp, settings, it, startedAt) }
             }
         }
     }

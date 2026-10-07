@@ -35,6 +35,9 @@ object FileStore {
     /** 書きかけのファイルにつける拡張子 (SAF・アプリ専用フォルダ)。完了時に .mp3 へ改名する。 */
     private const val PART_EXT = ".part"
 
+    /** MediaStore で書き込み中のファイルにつける名前の印。確定時に外す。 */
+    private const val TMP_SUFFIX = ".tmp"
+
     /** 書き込み先。書き終えたら [commit] (保存先の最終的なパス/URI を返す)、失敗したら [discard] を呼ぶ。 */
     class Target(val out: OutputStream, val commit: () -> String, val discard: () -> Unit)
 
@@ -68,16 +71,10 @@ object FileStore {
         val resolver = ctx.contentResolver
         val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val relative = "${Environment.DIRECTORY_MUSIC}/$DEFAULT_DIR_NAME/"
-        // 同名の自分のファイルが残っていれば先に消す (消えないと「名前 (1).mp3」になる)
-        runCatching {
-            resolver.delete(
-                collection,
-                "${MediaStore.Audio.Media.DISPLAY_NAME} = ? AND ${MediaStore.Audio.Media.RELATIVE_PATH} = ?",
-                arrayOf("$base.mp3", relative),
-            )
-        }
+        // 書き込み中は別名にしておく。同名の前のファイルは、書き終えて確定するときに入れ替える
+        // (先に消すと、取り直しに失敗したとき保存済みの記録だけが残ってしまう)
         val values = ContentValues().apply {
-            put(MediaStore.Audio.Media.DISPLAY_NAME, "$base.mp3")
+            put(MediaStore.Audio.Media.DISPLAY_NAME, "$base$TMP_SUFFIX.mp3")
             put(MediaStore.Audio.Media.MIME_TYPE, "audio/mpeg")
             put(MediaStore.Audio.Media.RELATIVE_PATH, relative)
             put(MediaStore.Audio.Media.IS_PENDING, 1)
@@ -90,6 +87,15 @@ object FileStore {
                 // 更新できないと端末の音楽に出ず再生もできないので、失敗として扱う (呼び出し側で discard される)
                 val updated = resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
                 check(updated > 0) { "IS_PENDING update failed" }
+                // 同名の前のファイルを消して、正式な名前にする。ここの失敗は無視する (別名のままでも再生はできる)
+                runCatching {
+                    resolver.delete(
+                        collection,
+                        "${MediaStore.Audio.Media.DISPLAY_NAME} = ? AND ${MediaStore.Audio.Media.RELATIVE_PATH} = ?",
+                        arrayOf("$base.mp3", relative),
+                    )
+                    resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.DISPLAY_NAME, "$base.mp3") }, null, null)
+                }
                 uri.toString()
             },
             discard = { runCatching { resolver.delete(uri, null, null) } },
@@ -122,14 +128,29 @@ object FileStore {
      * 中断されて残った書きかけのファイルを消す。ダウンロードが動いていないときだけ呼ぶこと。
      * 対象は、このアプリが付けた印 (MediaStore の IS_PENDING / 「ID_」で始まる .part) のあるファイルだけ。
      * [keep] は保存済みとして記録されているパス。改名に失敗して .part のまま残した再生可能なファイルを消さないために使う。
+     * [olderThanMs] より前に作られたファイルだけを消す。掃除の最中に始まったダウンロードの書きかけを巻き込まないために、
+     * 「ダウンロードが動いていない」ことを確かめる前の時刻を渡す。
      */
-    fun cleanupOrphans(ctx: Context, settings: AppSettings, keep: Set<String> = emptySet()) = runCatching {
+    fun cleanupOrphans(
+        ctx: Context,
+        settings: AppSettings,
+        keep: Set<String> = emptySet(),
+        olderThanMs: Long = Long.MAX_VALUE,
+    ) = runCatching {
         if (hasMediaStore) {
             val resolver = ctx.contentResolver
             val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            // DATE_ADDED は秒単位
+            val beforeSec = if (olderThanMs == Long.MAX_VALUE) Long.MAX_VALUE else olderThanMs / 1000
             val args = Bundle().apply {
-                putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "${MediaStore.Audio.Media.RELATIVE_PATH} = ?")
-                putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf("${Environment.DIRECTORY_MUSIC}/$DEFAULT_DIR_NAME/"))
+                putString(
+                    ContentResolver.QUERY_ARG_SQL_SELECTION,
+                    "${MediaStore.Audio.Media.RELATIVE_PATH} = ? AND ${MediaStore.Audio.Media.DATE_ADDED} < ?",
+                )
+                putStringArray(
+                    ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
+                    arrayOf("${Environment.DIRECTORY_MUSIC}/$DEFAULT_DIR_NAME/", beforeSec.toString()),
+                )
                 putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_ONLY)
             }
             val ids = mutableListOf<Long>()
@@ -139,11 +160,11 @@ object FileStore {
             ids.forEach { resolver.delete(ContentUris.withAppendedId(collection, it), null, null) }
         }
         ctx.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            ?.listFiles { f -> isOwnPart(f.name) && f.absolutePath !in keep }
+            ?.listFiles { f -> isOwnPart(f.name) && f.absolutePath !in keep && f.lastModified() < olderThanMs }
             ?.forEach { it.delete() }
         settings.downloadTreeUri?.let { tree ->
             DocumentFile.fromTreeUri(ctx, Uri.parse(tree))?.listFiles()
-                ?.filter { isOwnPart(it.name) && it.uri.toString() !in keep }
+                ?.filter { isOwnPart(it.name) && it.uri.toString() !in keep && it.lastModified() < olderThanMs }
                 ?.forEach { it.delete() }
         }
     }

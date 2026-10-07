@@ -57,7 +57,8 @@ class ListViewModel(
     var refreshCount by mutableIntStateOf(0); private set
     var error by mutableStateOf<String?>(null); private set
     private var page = 0
-    private var hasNext = true
+    /** まだ続きのページがあるか。 */
+    var hasNext = true; private set
 
     init { load(reset = false) }
 
@@ -203,6 +204,8 @@ fun VoiceListScreen(
                             Text(err)
                             TextButton(onClick = vm::retry) { Text(stringResource(R.string.reload)) }
                         }
+                        // 絞り込みで1回の読み込み分がすべて除かれ、自動では続きを読めない (一覧が空) ときの、続きの読み込み
+                        vm.items.isEmpty() && vm.hasNext -> TextButton(onClick = vm::loadMore) { Text(stringResource(R.string.reload)) }
                     }
                 }
             }

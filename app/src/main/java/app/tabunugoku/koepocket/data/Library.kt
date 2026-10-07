@@ -1,5 +1,9 @@
 package app.tabunugoku.koepocket.data
 
+import androidx.room.withTransaction
+
+private const val IN_CHUNK = 900
+
 /** お気に入り・保存済み・フォルダの操作。フォルダ分けの同期設定 ([AppSettings.syncFolders]) をここで一元的に扱う。 */
 class Library(private val db: AppDb, private val settings: AppSettings) {
     private val dao get() = db.dao()
@@ -58,14 +62,18 @@ class Library(private val db: AppDb, private val settings: AppSettings) {
         )
     }
 
-    suspend fun moveFavorites(ids: Set<Long>, folderId: Long?) {
-        dao.setFavoriteFolder(ids, folderId)
-        if (settings.syncFolders) dao.setDownloadFolder(ids, folderId)
+    // SQLite の変数の上限 (古い端末で 999) を超えないよう、IN (...) に渡す件数を分ける
+    private suspend fun inChunks(ids: Set<Long>, update: suspend (List<Long>) -> Unit) =
+        db.withTransaction { ids.chunked(IN_CHUNK).forEach { update(it) } }
+
+    suspend fun moveFavorites(ids: Set<Long>, folderId: Long?) = inChunks(ids) {
+        dao.setFavoriteFolder(it, folderId)
+        if (settings.syncFolders) dao.setDownloadFolder(it, folderId)
     }
 
-    suspend fun moveDownloads(ids: Set<Long>, folderId: Long?) {
-        dao.setDownloadFolder(ids, folderId)
-        if (settings.syncFolders) dao.setFavoriteFolder(ids, folderId)
+    suspend fun moveDownloads(ids: Set<Long>, folderId: Long?) = inChunks(ids) {
+        dao.setDownloadFolder(it, folderId)
+        if (settings.syncFolders) dao.setFavoriteFolder(it, folderId)
     }
 
     suspend fun createFolder(name: String): Long =

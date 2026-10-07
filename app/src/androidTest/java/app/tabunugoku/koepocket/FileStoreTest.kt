@@ -53,8 +53,8 @@ class FileStoreTest {
         // 掃除後は、書き込み中のものも含めて MediaStore に残っていない
         val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val args = Bundle().apply {
-            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "${MediaStore.Audio.Media.DISPLAY_NAME} = ?")
-            putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf("990002_pending-test.mp3"))
+            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "${MediaStore.Audio.Media.DISPLAY_NAME} LIKE ?")
+            putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf("990002_pending-test%"))
             putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE)
         }
         val left = ctx.contentResolver.query(collection, arrayOf(MediaStore.Audio.Media._ID), args, null)!!.use { it.count }
