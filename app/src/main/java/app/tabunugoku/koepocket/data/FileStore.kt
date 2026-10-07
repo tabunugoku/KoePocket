@@ -59,7 +59,12 @@ object FileStore {
         if (dir == null || !dir.canWrite()) return null
         dir.findFile("$base$PART_EXT")?.delete()
         val doc = dir.createFile("application/octet-stream", base + PART_EXT) ?: return null
-        val out = ctx.contentResolver.openOutputStream(doc.uri) ?: return null
+        val out = runCatching { ctx.contentResolver.openOutputStream(doc.uri) }.getOrNull()
+        if (out == null) {
+            // 書き込めないなら、作った書きかけのファイルを残さない
+            doc.delete()
+            return null
+        }
         return Target(
             out,
             commit = {
@@ -86,7 +91,12 @@ object FileStore {
             put(MediaStore.Audio.Media.IS_PENDING, 1)
         }
         val uri = resolver.insert(collection, values) ?: return null
-        val out = resolver.openOutputStream(uri) ?: return null
+        val out = runCatching { resolver.openOutputStream(uri) }.getOrNull()
+        if (out == null) {
+            // 書き込めないなら、作った書き込み中の行を残さない
+            runCatching { resolver.delete(uri, null, null) }
+            return null
+        }
         Target(
             out,
             commit = {
@@ -166,14 +176,21 @@ object FileStore {
             ids.forEach { resolver.delete(ContentUris.withAppendedId(collection, it), null, null) }
         }
         ctx.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            ?.listFiles { f -> isOwnPart(f.name) && f.absolutePath !in keep && f.lastModified() < olderThanMs }
+            ?.listFiles { f -> isOwnPart(f.name) && f.absolutePath !in keep && isOlder(f.lastModified(), olderThanMs) }
             ?.forEach { it.delete() }
         settings.downloadTreeUri?.let { tree ->
             DocumentFile.fromTreeUri(ctx, Uri.parse(tree))?.listFiles()
-                ?.filter { isOwnPart(it.name) && it.uri.toString() !in keep && it.lastModified() < olderThanMs }
+                ?.filter { isOwnPart(it.name) && it.uri.toString() !in keep && isOlder(it.lastModified(), olderThanMs) }
                 ?.forEach { it.delete() }
         }
     }
+
+    /**
+     * [olderThanMs] より前に更新されたファイルか。更新時刻が分からない (0) 場合は、書き込み中かもしれないので古いとはみなさない。
+     * [olderThanMs] が最大値のときは、時刻を問わずすべて対象にする。
+     */
+    private fun isOlder(lastModified: Long, olderThanMs: Long) =
+        olderThanMs == Long.MAX_VALUE || lastModified in 1 until olderThanMs
 
     /** このアプリが書きかけに付けた名前 (「ID_題名….part」) か。保存先が共有フォルダでも、他アプリの .part を巻き込まない。 */
     private fun isOwnPart(name: String?) = name != null && PART_NAME.matches(name)

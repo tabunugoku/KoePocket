@@ -70,6 +70,13 @@ fun DetailScreen(
     LaunchedEffect(id, reload) {
         error = null
         removedOnSite = false
+        // ダウンロード済みなら、ローカルのファイルで再生できる詳細を作って表示する。保存していなければ false
+        suspend fun showLocal(): Boolean {
+            val local = dao.downloaded(id) ?: return false
+            detail = VoiceDetail(id, local.title, FileStore.playUri(local.path), local.duration.orEmpty(), emptyList(), emptyList(), author = local.author.orEmpty())
+            offline = true
+            return true
+        }
         val fetched = try {
             app.api.detail(id)
         } catch (e: CancellationException) {
@@ -82,20 +89,18 @@ fun DetailScreen(
                 app.library.markRemoved(id)
             }
             // 削除されていても、通信できなくても、ダウンロード済みならローカルのファイルで再生できるようにする
-            val local = dao.downloaded(id)
-            if (local != null) {
-                detail = VoiceDetail(id, local.title, FileStore.playUri(local.path), local.duration.orEmpty(), emptyList(), emptyList(), author = local.author.orEmpty())
-                offline = true
-            } else {
-                error = errorMessage(ctx, e)
-            }
+            if (!showLocal()) error = errorMessage(ctx, e)
             return@LaunchedEffect
         }
-        detail = fetched
-        offline = false
         if (fetched == null) {
-            error = ctx.getString(R.string.voice_not_found)
+            // ページから音声を読み取れなかったときも、保存済みならローカルのファイルを使う
+            if (!showLocal()) {
+                detail = null
+                error = ctx.getString(R.string.voice_not_found)
+            }
         } else {
+            detail = fetched
+            offline = false
             // 保存済みの項目の更新に失敗しても、取得できた詳細の表示は妨げない
             try {
                 app.library.refresh(fetched)
@@ -188,7 +193,11 @@ fun DetailScreen(
                     pos = if (isCurrent) pos else 0,
                     dur = if (isCurrent) dur else 0,
                     fallbackDuration = d.duration,
-                    onToggle = { app.player.toggle(id, d.title, downloaded?.let { FileStore.playUri(it.path) } ?: d.audioUrl) },
+                    onToggle = {
+                        val local = downloaded?.let { FileStore.playUri(it.path) }
+                        // オフライン表示のときの d.audioUrl は保存先そのものなので、切り替え先にはならない
+                        app.player.toggle(id, d.title, local ?: d.audioUrl, fallbackUri = if (local != null && !offline) d.audioUrl else null)
+                    },
                     onSeekPreview = { dragging = true; pos = it },
                     onSeekDone = { app.player.seekTo(pos); dragging = false },
                 )

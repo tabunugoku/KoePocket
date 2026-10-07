@@ -82,17 +82,17 @@ class Library(private val db: AppDb, private val settings: AppSettings) {
     suspend fun renameFolder(id: Long, name: String) = dao.renameFolder(id, name.trim())
 
     /** フォルダを削除。中の項目は未分類に戻る (項目自体は消えない)。 */
-    suspend fun deleteFolder(id: Long) {
+    suspend fun deleteFolder(id: Long) = db.withTransaction {
         dao.clearFavoriteFolder(id)
         dao.clearDownloadFolder(id)
         dao.deleteFolder(id)
     }
 
     /** 同期を ON にしたとき、お気に入り側のフォルダを保存済みに揃える。 */
-    suspend fun syncDownloadsFromFavorites() {
+    suspend fun syncDownloadsFromFavorites() = db.withTransaction {
         dao.allDownloads().forEach { d ->
             val fav = dao.favorite(d.id) ?: return@forEach
-            if (fav.folderId != d.folderId) dao.setDownloadFolder(setOf(d.id), fav.folderId)
+            if (fav.folderId != d.folderId) dao.setDownloadFolder(listOf(d.id), fav.folderId)
         }
     }
 }

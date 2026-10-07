@@ -138,7 +138,9 @@ private fun LibraryScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    val folders by remember(app) { app.db.dao().folders() }.collectAsState(initial = emptyList())
+    // 最初の値が届くまでは null (空のフォルダ一覧と区別して、保存してある絞り込みを消さないため)
+    val loadedFolders by remember(app) { app.db.dao().folders() }.collectAsState(initial = null)
+    val folders = loadedFolders.orEmpty()
     var hist by remember { mutableStateOf(history.get(historyScope)) }
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -160,8 +162,9 @@ private fun LibraryScreen(
     val noneLabel = stringResource(R.string.uncategorized)
 
     // 消えたフォルダを選んだままにしない
-    LaunchedEffect(folders) {
-        if (folderFilter > 0 && folders.none { it.id == folderFilter }) folderFilter = FOLDER_ALL
+    LaunchedEffect(loadedFolders) {
+        val list = loadedFolders ?: return@LaunchedEffect
+        if (folderFilter > 0 && list.none { it.id == folderFilter }) folderFilter = FOLDER_ALL
     }
     val folderNames = remember(folders) { folders.associate { it.id to it.name } }
 

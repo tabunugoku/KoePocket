@@ -17,9 +17,15 @@ enum class AppLanguage(val tag: String, val nativeName: String?) {
     KO("ko", "한국어");
 
     companion object {
+        private val TRADITIONAL_REGIONS = setOf("TW", "HK", "MO")
+
         fun current(): AppLanguage {
-            val tags = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-            return entries.firstOrNull { it.tag.isNotEmpty() && it.tag.equals(tags, ignoreCase = true) } ?: SYSTEM
+            val locale = AppCompatDelegate.getApplicationLocales()[0] ?: return SYSTEM
+            // システムの設定で選ぶと ja-JP や zh-Hans-CN のように地域・文字体系つきで入るので、言語で照合する
+            return when (locale.language) {
+                "zh" -> if (locale.script == "Hant" || locale.country in TRADITIONAL_REGIONS) ZH_TW else ZH_CN
+                else -> entries.firstOrNull { it.tag.isNotEmpty() && it.tag.equals(locale.language, ignoreCase = true) } ?: SYSTEM
+            }
         }
 
         fun apply(lang: AppLanguage) {

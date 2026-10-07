@@ -62,6 +62,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                                     if (pct != lastPct) {
                                         lastPct = pct
                                         setProgress(workDataOf(KEY_PCT to pct))
+                                        // 通知の進捗も合わせる (失敗しても、ダウンロード自体は続ける)
+                                        if (pct >= 0) runCatching { setForeground(foregroundInfo(app, id, pct)) }
                                     }
                                 }
                             }
@@ -97,7 +99,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         return Result.success()
     }
 
-    private fun foregroundInfo(app: KoeKoeApp, id: Long): ForegroundInfo {
+    /** [pct] が 0 以上なら進捗を表示し、分からない (負) ときは動き続ける表示にする。 */
+    private fun foregroundInfo(app: KoeKoeApp, id: Long, pct: Int = -1): ForegroundInfo {
         val ctx = applicationContext
         val nm = ctx.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, ctx.getString(R.string.notif_channel_download), NotificationManager.IMPORTANCE_LOW))
@@ -110,11 +113,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             .setContentTitle(title)
             .setOngoing(true)
             .setSilent(true)
-            .setProgress(0, 0, true)
+            .apply { if (pct >= 0) setProgress(100, pct, false) else setProgress(0, 0, true) }
             .build()
         if (disguised && s.disguiseAppName.isNotBlank()) n.extras.putString("android.substName", s.disguiseAppName)
         // 同時に動く別の投稿のダウンロードと通知 ID が重ならないよう、投稿 ID から決める
-        val nid = (NOTIFICATION_ID + id).toInt()
+        val nid = NOTIFICATION_ID + (id % 1_000_000_000L).toInt()
         return if (Build.VERSION.SDK_INT >= 29) {
             ForegroundInfo(nid, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {

@@ -10,6 +10,7 @@ import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.IOException
 import java.net.URLEncoder
 
 /** 投稿が存在しない (削除された) ことを表す。 */
@@ -30,7 +31,15 @@ class KoeKoeApi(
         .build()
 
     /** 音声の取得 (ダウンロード・再生) 用。音声を HTTP キャッシュに書き込まず、一覧や詳細のキャッシュを押し出さない。 */
-    val audioClient: OkHttpClient = client.newBuilder().cache(null).build()
+    val audioClient: OkHttpClient = client.newBuilder()
+        .cache(null)
+        // リダイレクト先も含め、すべての通信先が信頼できる音声の取得先であることを確かめる
+        .addNetworkInterceptor { chain ->
+            val url = chain.request().url.toString()
+            if (!KoeKoeParser.isTrustedAudioUrl(url)) throw IOException("untrusted audio host")
+            chain.proceed(chain.request())
+        }
+        .build()
 
     private val gate = Mutex()
     private var last = 0L

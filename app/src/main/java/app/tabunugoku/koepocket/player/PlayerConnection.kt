@@ -26,6 +26,8 @@ class PlayerConnection(private val ctx: Context) {
     private var connecting = false
     /** 接続が切れていたときに、つなぎ直したあとで実行する操作。 */
     private var pending: (() -> Unit)? = null
+    /** 保存したファイルで再生を始めたときの、開けなかった場合に切り替える配信の項目。 */
+    private var fallback: MediaItem? = null
 
     init { connect() }
 
@@ -47,12 +49,26 @@ class PlayerConnection(private val ctx: Context) {
             connecting = false
             // 接続に失敗してもアプリは落とさない (次の再生操作でもう一度つなぐ)
             val c = runCatching { future.get() }.getOrNull()
-            if (c == null) { pending = null; return@addListener }
+            if (c == null) {
+                // 再生の操作を待っていたときは、何も起きないままにせず失敗を知らせる
+                if (pending != null) Toast.makeText(ctx, R.string.playback_error, Toast.LENGTH_SHORT).show()
+                pending = null
+                return@addListener
+            }
             controller = c
             c.addListener(object : Player.Listener {
                 override fun onEvents(player: Player, events: Player.Events) = sync(player)
                 override fun onPlayerError(error: PlaybackException) {
-                    Toast.makeText(ctx, R.string.playback_error, Toast.LENGTH_SHORT).show()
+                    // 保存したファイルが開けないときは、一度だけ配信 (ネット) からの再生に切り替える
+                    val f = fallback
+                    fallback = null
+                    if (f != null && c.currentMediaItem?.mediaId == f.mediaId) {
+                        c.setMediaItem(f)
+                        c.prepare()
+                        c.play()
+                    } else {
+                        Toast.makeText(ctx, R.string.playback_error, Toast.LENGTH_SHORT).show()
+                    }
                 }
             })
             sync(c)
@@ -69,10 +85,19 @@ class PlayerConnection(private val ctx: Context) {
         )
     }
 
-    /** 同じ音声なら再生/一時停止を切り替え、違う音声なら読み込んで再生する。 */
-    fun toggle(id: Long, title: String, uri: String) {
+    private fun mediaItem(id: Long, title: String, uri: String) = MediaItem.Builder()
+        .setMediaId(id.toString())
+        .setUri(uri.toUri())
+        .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
+        .build()
+
+    /**
+     * 同じ音声なら再生/一時停止を切り替え、違う音声なら読み込んで再生する。
+     * [fallbackUri] は、[uri] (保存したファイル) を開けなかったときに切り替える配信の URI。
+     */
+    fun toggle(id: Long, title: String, uri: String, fallbackUri: String? = null) {
         val c = controller ?: run {
-            pending = { toggle(id, title, uri) }
+            pending = { toggle(id, title, uri, fallbackUri) }
             connect()
             return
         }
@@ -82,13 +107,8 @@ class PlayerConnection(private val ctx: Context) {
             if (c.isPlaying) c.pause() else c.play()
             return
         }
-        c.setMediaItem(
-            MediaItem.Builder()
-                .setMediaId(id.toString())
-                .setUri(uri.toUri())
-                .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
-                .build()
-        )
+        fallback = fallbackUri?.takeIf { it != uri }?.let { mediaItem(id, title, it) }
+        c.setMediaItem(mediaItem(id, title, uri))
         c.prepare()
         c.play()
     }
