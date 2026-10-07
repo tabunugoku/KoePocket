@@ -105,7 +105,7 @@ fun SearchScreen(app: KoeKoeApp, onOpen: (Long) -> Unit) {
             val clientFilter = if (selected.size == 2) selected.map { it.key }.toSet() else emptySet()
             VoiceListScreen(
                 app, KoeKoeApi.searchPath(submitted, onlyOne?.g), onOpen,
-                Modifier.weight(1f), genders = clientFilter, reselectRoute = "search",
+                Modifier.weight(1f), genders = clientFilter, reselectRoute = TabRoutes.SEARCH,
             )
         }
     }

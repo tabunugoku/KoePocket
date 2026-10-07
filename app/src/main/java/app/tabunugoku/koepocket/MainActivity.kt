@@ -77,8 +77,8 @@ class MainActivity : AppCompatActivity() {
 }
 
 private enum class NavTab(val route: String, @StringRes val label: Int) {
-    HOME("home", R.string.tab_home), SEARCH("search", R.string.tab_search),
-    FAVORITES("favorites", R.string.tab_favorites), DOWNLOADS("downloads", R.string.tab_downloads)
+    HOME(TabRoutes.HOME, R.string.tab_home), SEARCH(TabRoutes.SEARCH, R.string.tab_search),
+    FAVORITES(TabRoutes.FAVORITES, R.string.tab_favorites), DOWNLOADS(TabRoutes.DOWNLOADS, R.string.tab_downloads)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -240,7 +240,7 @@ private fun HomeScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, onSettings: () ->
                 onDismiss = { showTagPicker = false },
             )
         }
-        VoiceListScreen(app, category.path(genre, tag), onOpen, Modifier.weight(1f), reselectRoute = "home")
+        VoiceListScreen(app, category.path(genre, tag), onOpen, Modifier.weight(1f), reselectRoute = TabRoutes.HOME)
     }
 }
 

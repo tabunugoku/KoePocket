@@ -20,10 +20,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -124,9 +126,20 @@ object ListCache {
 private const val MIN_NEW = 8
 private const val MAX_PAGES = 6
 
-/** 下部のタブを、選択中にもう一度タップしたことを各画面へ伝える。値はタブのルート。 */
+/** 下部のタブのルート。タブの定義と、再タップを受け取る各画面が同じ値を使う。 */
+object TabRoutes {
+    const val HOME = "home"
+    const val SEARCH = "search"
+    const val FAVORITES = "favorites"
+    const val DOWNLOADS = "downloads"
+}
+
+/**
+ * 下部のタブを、選択中にもう一度タップしたことを各画面へ伝える。値はタブのルート。
+ * 先頭へ戻している最中の連打でも落とさないよう、少し余裕を持たせてある (あふれたら古いものを捨てる)。
+ */
 object TabReselect {
-    val events = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val events = MutableSharedFlow<String>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 }
 
 /** [route] のタブが再タップされたら、[state] の一覧を先頭へ戻す。[route] が null なら何もしない。 */
@@ -162,7 +175,8 @@ fun VoiceListScreen(
     val key = path + "|" + genders.sorted().joinToString(",")
     val vm = remember(key) { ListCache.get(key) { ListViewModel(app, path, genders) } }
     val ctx = LocalContext.current
-    val state = rememberLazyListState()
+    // ジャンルやタグ (key) を切り替えたら、前の一覧のスクロール位置を引き継がず先頭から始める
+    val state = rememberSaveable(key, saver = LazyListState.Saver) { LazyListState() }
     ScrollToTopOnReselect(reselectRoute, state)
     val nearEnd by remember(vm, state) { derivedStateOf { state.layoutInfo.let { it.visibleItemsInfo.lastOrNull()?.index ?: 0 } >= vm.items.size - 3 } }
     LaunchedEffect(nearEnd, vm.items.size) { if (nearEnd && vm.items.isNotEmpty()) vm.loadMore() }
