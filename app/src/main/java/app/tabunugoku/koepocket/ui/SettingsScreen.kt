@@ -44,7 +44,7 @@ fun SettingsScreen(app: KoeKoeApp, onBack: () -> Unit, onLegal: () -> Unit) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
             // アプリを再起動しても読み書きできるよう、権限を永続化する
-            // 永続化できないフォルダ (提供元が対応していない) は選べないので、設定を変えずに戻る
+            // 永続化できないフォルダ (提供元が対応していない) が選ばれたときは、設定を変えずに戻る
             val persisted = runCatching {
                 ctx.contentResolver.takePersistableUriPermission(
                     uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
