@@ -117,6 +117,27 @@ class LibraryTest {
     }
 
     @Test
+    fun movingMoreThanSqliteVariableLimitWorks() = runBlocking {
+        val ids = (1L..2000L).toSet()
+        ids.forEach { library.addFavorite(detail(it)); library.addDownload(detail(it), "p$it") }
+        val f = library.createFolder("F")
+        library.moveFavorites(ids, f)
+        assertEquals(2000, dao.allDownloads().count { it.folderId == f })
+        assertEquals(f, dao.favorite(2000)!!.folderId)
+    }
+
+    @Test
+    fun refreshKeepsStoredAuthorAndDurationWhenParsedEmpty() = runBlocking {
+        library.addFavorite(detail(1))
+        library.addDownload(detail(1), "p")
+        library.refresh(detail(1).copy(author = "", duration = ""))
+        assertEquals("投稿者", dao.favorite(1)!!.author)
+        assertEquals("1分", dao.favorite(1)!!.duration)
+        assertEquals("投稿者", dao.downloaded(1)!!.author)
+        assertEquals("1分", dao.downloaded(1)!!.duration)
+    }
+
+    @Test
     fun refreshClearsRemovedMarkAndFillsGender() = runBlocking {
         library.addFavorite(detail(1).copy(gender = ""))
         library.markRemoved(1)
