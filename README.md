@@ -1,21 +1,73 @@
 # KoePocket
 
+An unofficial, personal-use Android viewer for the voice board [Koe-Koe](https://koe-koe.com).
+Browse, search and play posts, manage favorites and folders, and save audio. It is not affiliated with Koe-Koe's operators or its posters.
+
+**For users aged 18 and over only.** A confirmation screen is shown on first launch.
+
+Project page: https://tabunugoku.github.io/KoePocket/
+
+<p>
+  <img src="docs/img/agreement.png" width="13%" alt="First-launch confirmation">
+  <img src="docs/img/home.png" width="13%" alt="Home">
+  <img src="docs/img/detail.png" width="13%" alt="Post details and playback">
+  <img src="docs/img/search.png" width="13%" alt="Search">
+  <img src="docs/img/favorites.png" width="13%" alt="Favorites">
+  <img src="docs/img/downloads.png" width="13%" alt="Saved">
+  <img src="docs/img/settings.png" width="13%" alt="Settings">
+</p>
+
+The posts shown in the screenshots are dummies made for testing. They are not real posts.
+
+## Installation
+
+1. Download `KoePocket-x.y.z.apk` from [Releases](../../releases).
+2. Allow installing apps from unknown sources on your device, then open the APK.
+3. If Play Protect shows a prompt, you can choose "Don't send" if you wish.
+
+Requires Android 8.0 (API 26) or later. Not published on Google Play.
+
+## Languages
+
+Supports Japanese, English, Simplified Chinese, Traditional Chinese and Korean. You can switch the language in Settings, independently of the device language. Post titles, bodies, comments and tags are shown in the site's original Japanese.
+
+## Privacy
+
+- Favorites, folders, search history, settings and saved audio are all stored on the device. Nothing is sent externally.
+- There are no accounts, analytics or ads. The only server the app talks to is koe-koe.com.
+- Audio is saved to `Music/KoePocket` by default (changeable in Settings). Because it lives in the device's music folder, other music and file-manager apps may show it.
+- The screen is hidden in the recent-apps list and screenshots (configurable in Settings). The browsing cache can be cleared from Settings.
+
+## Disclaimer
+
+- Copyright of the audio and text belongs to the posters and Koe-Koe. Article 4 of Koe-Koe's [Terms of Use](https://koe-koe.com/kiyaku.php) prohibits unauthorized copying, reposting, public transmission and distribution. Keep saved audio for private use and do not redistribute it.
+- This app is free, with no ads or commercial purpose. Because the terms prohibit commercial activity, it will never be paid or ad-supported.
+- Follow Koe-Koe's Terms of Use. The app may stop working if the site changes.
+- If Koe-Koe's operators make contact, the repository and pages will be taken down.
+- Provided as is. The author accepts no liability for any damage arising from its use.
+
+## Build
+
+Requires JDK 17 and the Android SDK.
+
+```
+gradlew.bat assembleDebug
+```
+
+For release signing, place a `keystore.properties` (`storeFile` / `storePassword` / `keyAlias` / `keyPassword`) in the project root,
+and `gradlew.bat assembleRelease` will apply it. This file and the keystore are not included in the repository.
+
+<details>
+<summary>日本語 (Japanese)</summary>
+
+# KoePocket
+
 音声掲示板 [Koe-Koe](https://koe-koe.com) を Android で閲覧するための、個人利用向けの非公式ビューアです。
 一覧・検索・再生、お気に入りとフォルダ管理、音声の保存ができます。Koe-Koe の運営者・投稿者とは無関係です。
 
 **18歳以上の方のみ利用できます。** 初回起動時に確認画面を出します。
 
 紹介ページ: https://tabunugoku.github.io/KoePocket/
-
-<p>
-  <img src="docs/img/agreement.png" width="13%" alt="初回の確認">
-  <img src="docs/img/home.png" width="13%" alt="ホーム">
-  <img src="docs/img/detail.png" width="13%" alt="投稿の詳細と再生">
-  <img src="docs/img/search.png" width="13%" alt="検索">
-  <img src="docs/img/favorites.png" width="13%" alt="お気に入り">
-  <img src="docs/img/downloads.png" width="13%" alt="保存済み">
-  <img src="docs/img/settings.png" width="13%" alt="設定">
-</p>
 
 画像に写る投稿は、動作確認用に作ったダミーです。実在の投稿ではありません。
 
@@ -56,3 +108,5 @@ gradlew.bat assembleDebug
 
 リリース署名は、ルートに `keystore.properties` (`storeFile` / `storePassword` / `keyAlias` / `keyPassword`) を置くと
 `gradlew.bat assembleRelease` で適用されます。このファイルとキーストアはリポジトリに含めません。
+
+</details>
