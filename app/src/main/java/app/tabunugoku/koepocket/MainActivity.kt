@@ -6,7 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.annotation.StringRes
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.ui.graphics.Color
@@ -91,8 +91,8 @@ private fun AppRoot(app: KoeKoeApp) {
     val openDetail = { id: Long -> nav.navigate("detail/$id") }
     // タイトルとパスは、記号を含むので Base64(URL セーフ) にしてルートに載せる
     val openList = { title: String, path: String -> nav.navigate("list/${b64(title)}/${b64(path)}") }
-    val ctx = LocalContext.current
-    val openTag = { tag: String -> openList(ctx.getString(R.string.tag_prefix, tag), KoeKoeApi.tagPath(tag)) }
+    val res = LocalResources.current
+    val openTag = { tag: String -> openList(res.getString(R.string.tag_prefix, tag), KoeKoeApi.tagPath(tag)) }
 
     val showTabs = NavTab.entries.any { t -> dest?.hierarchy?.any { it.route == t.route } == true }
     Scaffold(
