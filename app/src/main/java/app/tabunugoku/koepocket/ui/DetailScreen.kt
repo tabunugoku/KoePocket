@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,6 +59,7 @@ fun DetailScreen(
     onList: (String, String) -> Unit,
 ) {
     val ctx = LocalContext.current
+    val res = LocalResources.current
     val scope = rememberCoroutineScope()
     val dao = app.db.dao()
 
@@ -96,7 +98,7 @@ fun DetailScreen(
             // ページから音声を読み取れなかったときも、保存済みならローカルのファイルを使う
             if (!showLocal()) {
                 detail = null
-                error = ctx.getString(R.string.voice_not_found)
+                error = res.getString(R.string.voice_not_found)
             }
         } else {
             detail = fetched
@@ -242,7 +244,7 @@ fun DetailScreen(
             if (d.authorPath != null || d.genrePath != null) item {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (d.authorPath != null && d.author.isNotEmpty()) AssistChip(
-                        onClick = { onList(ctx.getString(R.string.author_prefix, d.author), d.authorPath) },
+                        onClick = { onList(res.getString(R.string.author_prefix, d.author), d.authorPath) },
                         leadingIcon = { Icon(Icons.Filled.Person, null, Modifier.size(18.dp)) },
                         label = { Text(d.author) },
                     )
@@ -250,7 +252,7 @@ fun DetailScreen(
                         // サイトの日本語のジャンル名は、アプリ側の訳に置き換える (対応するものがなければそのまま)
                         val genreName = Genre.fromPath(d.genrePath)?.let { stringResource(it.labelRes) } ?: d.genre
                         AssistChip(
-                            onClick = { onList(ctx.getString(R.string.genre_prefix, genreName), d.genrePath) },
+                            onClick = { onList(res.getString(R.string.genre_prefix, genreName), d.genrePath) },
                             leadingIcon = { Icon(Icons.Filled.Mic, null, Modifier.size(18.dp)) },
                             label = { Text(genreName) },
                         )

@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -93,13 +94,14 @@ fun FavoritesScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier =
 fun DownloadsScreen(app: KoeKoeApp, onOpen: (Long) -> Unit, modifier: Modifier = Modifier) {
     val dao = app.db.dao()
     val ctx = LocalContext.current
+    val res = LocalResources.current
     val scope = rememberCoroutineScope()
     val list by remember(dao) { dao.downloads() }.collectAsState(initial = emptyList())
     LibraryScreen(
         app = app,
         title = stringResource(R.string.tab_downloads),
         items = list.map {
-            LibItem(it.id, it.title, subtitleOf(ctx, it.author, it.duration, it.commentCount, ctx.getString(R.string.offline_playable)), it.addedAt, it.folderId, it.gender, it.removed)
+            LibItem(it.id, it.title, subtitleOf(ctx, it.author, it.duration, it.commentCount, res.getString(R.string.offline_playable)), it.addedAt, it.folderId, it.gender, it.removed)
         },
         emptyText = stringResource(R.string.dl_empty),
         deleteLabel = stringResource(R.string.dl_delete),
